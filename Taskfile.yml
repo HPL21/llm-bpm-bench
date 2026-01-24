@@ -1,0 +1,65 @@
+version: '3'
+
+vars:
+  API_CONTAINER: llm_api
+
+tasks:
+  default:
+    desc: Displays a list of available tasks
+    cmds:
+      - task --list
+
+  up:
+    desc: Start the whole environment in the background (Docker Compose)
+    cmds:
+      - docker compose up -d
+      - echo "Environment started! Swagger: http://localhost:8000/docs"
+
+  down:
+    desc: Stop and remove all containers
+    cmds:
+      - docker compose down
+
+  stop:
+    desc: Stop containers without removing them (can be resumed later)
+    cmds:
+      - docker compose stop
+
+  restart:
+    desc: Quick restart of the API service (useful when changing config/env)
+    cmds:
+      - docker compose restart api
+
+  build:
+    desc: Rebuild containers (use this after adding new libraries via 'uv add')
+    cmds:
+      - docker compose up --build -d
+
+  logs:
+    desc: Follow API logs in real-time
+    cmds:
+      - docker compose logs -f api
+
+  test:
+    desc: Run unit tests (pytest) inside the container
+    cmds:
+      - docker exec -it {{.API_CONTAINER}} pytest -v
+
+  bash:
+    desc: Enter the API container shell
+    cmds:
+      - docker exec -it {{.API_CONTAINER}} /bin/bash
+
+  lint:
+    desc: Auto-format and fix code (Ruff)
+    dir: API
+    cmds:
+      - uv run ruff check --fix .
+      - uv run ruff format .
+      - echo "Code cleaned!"
+
+  clean:
+    desc: Clean everything (removes containers and volumes - WARNING: deletes database!)
+    prompt: Are you sure you want to delete the database and all files?
+    cmds:
+      - docker compose down -v --remove-orphans
