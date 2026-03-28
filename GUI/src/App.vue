@@ -8,7 +8,7 @@ import { DatabaseIcon, ListChecksIcon, FolderOpenIcon } from 'lucide-vue-next';
     <header class="bg-slate-900 text-white shadow-md z-20">
       <div class="flex items-center px-6 py-3">
         <div class="text-lg font-bold mr-8 tracking-wide flex items-center">
-          <span class="text-indigo-400 mr-2">LLM</span> Bench
+          <span class="text-indigo-400 mr-2">LLM</span> <span class="text-white-400 mr-2">BPM</span> <span class="text-indigo-400 mr-2">Bench</span>
         </div>
         
         <nav class="flex space-x-1">

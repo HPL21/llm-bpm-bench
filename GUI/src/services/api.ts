@@ -34,5 +34,10 @@ export const FileService = {
 
     async deleteFile(id: string) {
         await api.delete(`/files/${id}`);
-    }
+    },
+
+    async createCollection(name: string) {
+        const response = await api.post<FileAsset>('/files/collections', { name });
+        return response.data;
+    },
 };

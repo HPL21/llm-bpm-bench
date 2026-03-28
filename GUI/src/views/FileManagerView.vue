@@ -5,14 +5,22 @@ import { FolderIcon, UploadCloudIcon } from 'lucide-vue-next';
 
 import CollectionSidebar from '../components/files/CollectionSidebar.vue';
 import FileGrid from '../components/files/FileGrid.vue';
+import CollectionModal from '../components/files/CollectionModal.vue'; // Dodany import
 
 const files = ref<FileAsset[]>([]);
 const selectedCollection = ref<string>('default');
 const isUploading = ref(false);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 
+const isModalOpen = ref(false);
+
 const collections = computed(() => Array.from(new Set(files.value.map(f => f.collection_name))));
-const currentFiles = computed(() => files.value.filter(f => f.collection_name === selectedCollection.value));
+
+const currentFiles = computed(() => {
+  return files.value.filter(
+    f => f.collection_name === selectedCollection.value && f.filename !== '.keep'
+  );
+});
 
 const loadFiles = async () => {
   try {
@@ -25,10 +33,16 @@ const loadFiles = async () => {
   }
 };
 
-const handleCreateCollection = () => {
-  const name = prompt("Podaj nazwę nowego katalogu/zbioru:");
-  if (name && name.trim()) {
-    selectedCollection.value = name.trim();
+
+const handleCreateCollection = async (name: string) => {
+  try {
+    await FileService.createCollection(name);
+    await loadFiles();
+    selectedCollection.value = name;
+    isModalOpen.value = false;
+  } catch (error) {
+    console.error("Błąd tworzenia katalogu:", error);
+    alert("Wystąpił błąd podczas tworzenia katalogu.");
   }
 };
 
@@ -66,12 +80,12 @@ onMounted(loadFiles);
 </script>
 
 <template>
-  <div class="flex w-full h-full bg-gray-50 text-gray-800">
+  <div class="flex w-full h-full bg-gray-50 text-gray-800 relative">
     <CollectionSidebar 
       :collections="collections" 
       :selected-collection="selectedCollection"
       @select="(val) => selectedCollection = val"
-      @create="handleCreateCollection"
+      @create="isModalOpen = true" 
     />
 
     <main class="flex-1 flex flex-col overflow-hidden">
@@ -96,5 +110,11 @@ onMounted(loadFiles);
 
       <FileGrid :files="currentFiles" @delete="handleDelete" />
     </main>
+
+    <CollectionModal 
+      :is-open="isModalOpen" 
+      @close="isModalOpen = false"
+      @confirm="handleCreateCollection"
+    />
   </div>
 </template>

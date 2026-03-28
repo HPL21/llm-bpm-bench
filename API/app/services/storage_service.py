@@ -28,7 +28,18 @@ class StorageService:
             self.client.make_bucket(self.bucket_name)
             print(f"Bucket '{self.bucket_name}' created successfully.")
 
-    def upload_file(self, file: UploadFile) -> str:
+    def create_empty_collection(self, collection_name: str) -> str:
+        object_name = f"{collection_name}/.keep"
+        self.client.put_object(
+            bucket_name=self.bucket_name,
+            object_name=object_name,
+            data=io.BytesIO(b""),
+            length=0,
+            content_type="application/x-empty",
+        )
+        return object_name
+
+    def upload_file(self, file: UploadFile, collection_name: str = "default") -> str:
         """
         Uploads a file stream to the MinIO bucket.
 
@@ -40,14 +51,19 @@ class StorageService:
         file_size = len(content)
         file_data = io.BytesIO(content)
 
+        object_name = f"{collection_name}/{file.filename}"
+
         self.client.put_object(
             bucket_name=self.bucket_name,
-            object_name=file.filename,  # type: ignore
+            object_name=object_name,
             data=file_data,
             length=file_size,
             content_type=file.content_type,  # type: ignore
         )
-        return str(file.filename)
+        return object_name
+
+    def delete_file(self, object_name: str) -> None:
+        self.client.remove_object(self.bucket_name, object_name)
 
     def list_files(self) -> List[str]:
         """
