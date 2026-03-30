@@ -18,6 +18,10 @@ class TestSuiteBase(BaseModel):
         min_length=1,
         description=" The system prompt used for all tests in this suite",
     )
+    verification_method: str = Field(
+        ...,
+        description="Method like EXACT_MATCH, JSON_COMPARE, OCR_MATCH"
+    )
 
 
 class TestSuiteCreate(TestSuiteBase):
@@ -32,6 +36,7 @@ class TestSuiteUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     system_prompt: str | None = None
+    verification_method: str | None = None
 
 
 class TestSuiteRead(TestSuiteBase):

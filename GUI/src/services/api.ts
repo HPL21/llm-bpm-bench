@@ -15,6 +15,16 @@ export interface FileAsset {
     created_at: string;
 }
 
+export interface TestSuite {
+  id: string;
+  name: string;
+  description: string | null;
+  system_prompt: string;
+  verification_method: string;
+  created_at: string;
+  updated_at: string | null;
+}
+
 export const FileService = {
     async getAllFiles() {
         const response = await api.get<FileAsset[]>('/files/');
@@ -40,4 +50,27 @@ export const FileService = {
         const response = await api.post<FileAsset>('/files/collections', { name });
         return response.data;
     },
+};
+
+export type TestSuiteCreate = Omit<TestSuite, 'id' | 'created_at' | 'updated_at'>;
+
+export const SuiteService = {
+  async getAllSuites() {
+    const response = await api.get<TestSuite[]>('/suites/');
+    return response.data;
+  },
+  
+  async createSuite(data: TestSuiteCreate) {
+    const response = await api.post<TestSuite>('/suites/', data);
+    return response.data;
+  },
+  
+  async updateSuite(id: string, data: Partial<TestSuiteCreate>) {
+    const response = await api.put<TestSuite>(`/suites/${id}`, data);
+    return response.data;
+  },
+  
+  async deleteSuite(id: string) {
+    await api.delete(`/suites/${id}`);
+  }
 };
