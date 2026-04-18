@@ -106,3 +106,51 @@ export const CaseService = {
     await api.delete(`/cases/${caseId}`);
   }
 };
+
+export interface TestSuite {
+  id: string;
+  name: string;
+  description: string | null;
+  system_prompt: string;
+  verification_method: string;
+  parameters?: Record<string, any> | null; // <--- DODANE
+  created_at: string;
+  updated_at: string | null;
+}
+
+
+export interface LLMModel {
+  id: string;
+  name: string;
+  provider: string;
+  api_base_url: string;
+  model_identifier: string;
+  api_key: string | null;
+  parameters: Record<string, any>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export type LLMModelCreate = Omit<LLMModel, 'id' | 'created_at' | 'updated_at'>;
+
+export const ModelService = {
+  async getAllModels() {
+    const response = await api.get<LLMModel[]>('/llm-models/');
+    return response.data;
+  },
+  
+  async createModel(data: LLMModelCreate) {
+    const response = await api.post<LLMModel>('/llm-models/', data);
+    return response.data;
+  },
+  
+  async updateModel(id: string, data: Partial<LLMModelCreate>) {
+    const response = await api.put<LLMModel>(`/llm-models/${id}`, data);
+    return response.data;
+  },
+  
+  async deleteModel(id: string) {
+    await api.delete(`/llm-models/${id}`);
+  }
+};

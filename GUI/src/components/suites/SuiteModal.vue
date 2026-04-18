@@ -20,6 +20,8 @@ const formData = ref<TestSuiteCreate>({
   verification_method: 'EXACT_MATCH'
 });
 
+const parametersString = ref('');
+
 const verificationMethods = [
   { value: 'EXACT_MATCH', label: 'Dokładne dopasowanie tekstu' },
   { value: 'JSON_COMPARE', label: 'Porównanie struktury i wartości JSON' },
@@ -33,8 +35,10 @@ watch(() => props.isOpen, async (isOpen) => {
   if (isOpen) {
     if (props.suiteToEdit) {
       formData.value = { ...props.suiteToEdit, description: props.suiteToEdit.description || '' };
+      parametersString.value = props.suiteToEdit.parameters ? JSON.stringify(props.suiteToEdit.parameters, null, 2) : '';
     } else {
       formData.value = { name: '', description: '', system_prompt: '', verification_method: 'EXACT_MATCH' };
+      parametersString.value = '';
     }
     await nextTick();
     inputRef.value?.focus();
@@ -43,7 +47,16 @@ watch(() => props.isOpen, async (isOpen) => {
 
 const handleSave = () => {
   if (formData.value.name.trim() && formData.value.system_prompt.trim()) {
-    emit('save', { ...formData.value });
+    let parsedParams = null;
+    if (parametersString.value.trim()) {
+      try {
+        parsedParams = JSON.parse(parametersString.value);
+      } catch (e) {
+        alert("Błędny format JSON w parametrach! Sprawdź składnię.");
+        return;
+      }
+    }
+    emit('save', { ...formData.value, parameters: parsedParams });
   }
 };
 </script>
@@ -84,6 +97,12 @@ const handleSave = () => {
           <label class="block text-sm font-medium text-gray-700 mb-1">System Prompt *</label>
           <p class="text-xs text-gray-500 mb-2">Instrukcja główna, która zostanie wysłana do LLMa podczas wykonywania tego zbioru testów.</p>
           <textarea v-model="formData.system_prompt" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm" placeholder="Jesteś asystentem AI. Twoim zadaniem jest..."></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Parametry (JSON, opcjonalnie)</label>
+          <p class="text-xs text-gray-500 mb-2">Opcjonalne nadpisania parametrów dla tego zbioru. Wymagany poprawny JSON.</p>
+          <textarea v-model="parametersString" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm" placeholder='{"temperature": 0.5}'></textarea>
         </div>
       </div>
       
