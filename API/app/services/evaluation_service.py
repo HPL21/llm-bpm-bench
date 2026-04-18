@@ -1,6 +1,8 @@
 import json
+import re
 from typing import Any, Dict, Tuple
 from rapidfuzz import fuzz, utils
+from app.core.llm_clients import BaseLLMClient
 
 
 class EvaluationService:
@@ -76,21 +78,47 @@ class EvaluationService:
         return round(score, 4), {}
 
     @staticmethod
-    async def evaluate_llm_eval(expected: str, actual: str, system_prompt: str | None = None) -> Tuple[float, Dict[str, Any]]:
+    async def evaluate_llm_eval(
+        expected: str,
+        actual: str,
+        judge_client: BaseLLMClient | None = None,
+        system_prompt: str | None = None
+    ) -> Tuple[float, Dict[str, Any]]:
         """
         Ocena przy pomocy LLM jako sędziego.
         Zwraca stopień zgodności (0.0 - 1.0) oraz uzasadnienie.
         """
-        # TODO: Integracja z LLMem sędziowskim.
-        # Właściwa odpowiedź sędziego powinna zostać przeparsowana tak, by wyciągnąć
-        # ocenę od 0 do 10 (i podzielić przez 10) lub od 0 do 1.
 
-        # TYMCZASOWA ZAŚLEPKA obliczająca pseudo-punktację
-        mock_score = fuzz.ratio(expected, actual, processor=utils.default_process) / 100.0
+        if not judge_client:
+            raise Exception("Błąd: judge_client musi być zdefiniowany!")
 
-        return round(mock_score, 4), {
-            "reason": "To jest przykładowe uzasadnienie (ZAŚLEPKA). W przyszłości będzie tu tekst wygenerowany przez sędziego LLM, np.: 'Otrzymana odpowiedź pokrywa większość założeń, ale pomija aspekt X...'"  # noqa
-        }
+        default_system_prompt = system_prompt or (
+            "Jesteś sędzią oceniającym jakość odpowiedzi modelu. "
+            "Porównaj odpowiedź 'Otrzymaną' z odpowiedzią 'Oczekiwaną'. "
+            "Na samym końcu swojej analizy wypisz ostateczną ocenę w formacie: [SCORE: X.XX] gdzie X.XX to wartość od 0.0 do 1.0."
+        )
+
+        prompt = f"Oczekiwana odpowiedź:\n{expected}\n\nOtrzymana odpowiedź:\n{actual}"
+
+        try:
+            response_text = await judge_client.generate(prompt=prompt, system_prompt=default_system_prompt)
+            match = re.search(r"\[SCORE:\s*([0-1](?:\.\d+)?)\]", response_text)
+            if match:
+                score = float(match.group(1))
+            else:
+                score = 0.0
+                response_text = f"BŁĄD PARSOWANIA WYNIKU SĘDZIEGO:\n{response_text}"
+            return round(score, 4), {"reason": response_text.strip()}
+        except Exception as e:
+            from app.core.llm_clients import LLMAPIError, LLMException
+            error_reason = f"Błąd wewnętrzny systemu LLM: {str(e)}"
+            if isinstance(e, LLMAPIError):
+                error_reason = f"Błąd API {e.status_code} od modelu sędziego: {e.response_body}"
+            elif isinstance(e, LLMException):
+                error_reason = f"Problem z komunikacją z modelem sędzią: {str(e)}"
+            import logging
+            logging.getLogger(__name__).warning(f"Ewaluacja LLM_EVAL nie powiodła się: {error_reason}")
+            return 0.0, {"error": error_reason}
 
     @classmethod
     async def evaluate(cls, verification_method: str, expected: str, actual: str, **kwargs) -> Tuple[float, Dict[str, Any]]:
@@ -102,6 +130,11 @@ class EvaluationService:
         elif verification_method == "OCR_MATCH":
             return cls.evaluate_ocr_match(expected, actual)
         elif verification_method == "LLM_EVAL":
-            return await cls.evaluate_llm_eval(expected, actual, kwargs.get("system_prompt"))
+            return await cls.evaluate_llm_eval(
+                expected,
+                actual,
+                judge_client=kwargs.get("judge_client"),
+                system_prompt=kwargs.get("system_prompt"),
+            )
         else:
             raise ValueError(f"Nieobsługiwana metoda weryfikacji: {verification_method}")
