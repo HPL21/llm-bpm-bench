@@ -1,5 +1,6 @@
 import uuid
-from sqlalchemy import String, Text, Uuid
+from typing import Any
+from sqlalchemy import String, Text, Uuid, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base
 
@@ -20,6 +21,7 @@ class TestSuite(Base):
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     system_prompt: Mapped[str] = mapped_column(Text, nullable=False)
     verification_method: Mapped[str] = mapped_column(String, nullable=False, default="EXACT_MATCH")
+    parameters: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True, default=None)
 
     def __repr__(self) -> str:
         return f"<TestSuite(id={self.id}, name='{self.name}')>"

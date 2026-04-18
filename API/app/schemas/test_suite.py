@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid import UUID
-
+from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -22,6 +22,7 @@ class TestSuiteBase(BaseModel):
         ...,
         description="Method like EXACT_MATCH, JSON_COMPARE, OCR_MATCH"
     )
+    parameters: dict[str, Any] | None = Field(None, description="Optional parameter overrides for this suite")
 
 
 class TestSuiteCreate(TestSuiteBase):
@@ -37,6 +38,7 @@ class TestSuiteUpdate(BaseModel):
     description: str | None = None
     system_prompt: str | None = None
     verification_method: str | None = None
+    parameters: dict[str, Any] | None = None
 
 
 class TestSuiteRead(TestSuiteBase):
