@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import FileManagerView from '../views/FileManagerView.vue';
 import TestSuitesView from '../views/TestSuitesView.vue';
+import TestCasesView from '../views/TestCasesView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -19,6 +20,12 @@ const router = createRouter({
       name: 'TestSuites',
       component: TestSuitesView
     },
+    {
+      path: '/suites/:id/cases',
+      name: 'TestCases',
+      component: TestCasesView,
+      props: true
+    }
   ]
 });
 

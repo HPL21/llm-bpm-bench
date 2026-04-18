@@ -58,9 +58,7 @@ const handleDelete = async (id: string) => {
 };
 
 const goToTestCases = (suiteId: string) => {
-  // To na razie wyświetli alert, później zrobimy prawdziwy routing do przypadków
-  alert(`Tu otworzymy widok przypadków testowych dla zbioru: ${suiteId}`);
-  // Docelowo: router.push(`/suites/${suiteId}/cases`);
+  router.push(`/suites/${suiteId}/cases`);
 };
 
 onMounted(loadSuites);

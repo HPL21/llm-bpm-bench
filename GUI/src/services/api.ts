@@ -74,3 +74,35 @@ export const SuiteService = {
     await api.delete(`/suites/${id}`);
   }
 };
+
+
+export interface TestCase {
+  id: string;
+  suite_id: string;
+  input_text: string;
+  expected_output: string | null;
+  files: FileAsset[];
+  created_at: string;
+}
+
+export const CaseService = {
+  async getSuiteCases(suiteId: string) {
+    const response = await api.get<TestCase[]>(`/cases/suite/${suiteId}`);
+    return response.data;
+  },
+  
+  async importCsv(suiteId: string, collectionName: string, file: File) {
+    const formData = new FormData();
+    formData.append('collection_name', collectionName);
+    formData.append('file', file);
+    
+    const response = await api.post(`/cases/suite/${suiteId}/import-csv`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+
+  async deleteCase(caseId: string) {
+    await api.delete(`/cases/${caseId}`);
+  }
+};
