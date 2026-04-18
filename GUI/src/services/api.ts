@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000/api/v1'; // Dostosuj do swojego środowiska
+const API_URL = 'http://localhost:8000/api/v1';
 
 export const api = axios.create({
     baseURL: API_URL,
@@ -113,7 +113,7 @@ export interface TestSuite {
   description: string | null;
   system_prompt: string;
   verification_method: string;
-  parameters?: Record<string, any> | null; // <--- DODANE
+  parameters?: Record<string, any> | null;
   created_at: string;
   updated_at: string | null;
 }
@@ -132,6 +132,12 @@ export interface LLMModel {
   updated_at: string | null;
 }
 
+export interface ModelTestResponse {
+  success: boolean;
+  response: string | null;
+  error: string | null;
+}
+
 export type LLMModelCreate = Omit<LLMModel, 'id' | 'created_at' | 'updated_at'>;
 
 export const ModelService = {
@@ -146,11 +152,74 @@ export const ModelService = {
   },
   
   async updateModel(id: string, data: Partial<LLMModelCreate>) {
-    const response = await api.put<LLMModel>(`/llm-models/${id}`, data);
+    const response = await api.patch<LLMModel>(`/llm-models/${id}`, data);
     return response.data;
   },
   
   async deleteModel(id: string) {
     await api.delete(`/llm-models/${id}`);
+  },
+
+  async testModel(id: string, prompt: string) {
+    const response = await api.post<ModelTestResponse>(`/llm-models/${id}/test`, { prompt });
+    return response.data;
+  }
+};
+
+
+export interface BenchmarkRunCreate {
+  name?: string | null;
+  model_ids: string[];
+  suite_ids: string[];
+}
+
+export interface BenchmarkRun {
+  id: string;
+  name: string | null;
+  status: string;
+  total_executions: number;
+  created_at: string;
+}
+
+export interface BenchmarkExecution {
+  id: string;
+  test_case_id: string;
+  llm_model_id: string;
+  status: string;
+  response_text: string | null;
+  score: number | null;
+  error_message: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  latency_ms: number | null;
+  updated_at: string;
+}
+
+export interface BenchmarkRunDetail extends BenchmarkRun {
+  completed_executions: number;
+  failed_executions: number;
+  pending_executions: number;
+  executions: BenchmarkExecution[];
+}
+
+export const BenchmarkService = {
+  async getAllRuns() {
+    const response = await api.get<BenchmarkRun[]>('/benchmarks/runs');
+    return response.data;
+  },
+  
+  async getRunDetails(id: string) {
+    const response = await api.get<BenchmarkRunDetail>(`/benchmarks/runs/${id}`);
+    return response.data;
+  },
+  
+  async createRun(data: BenchmarkRunCreate) {
+    const response = await api.post<BenchmarkRun>('/benchmarks/runs', data);
+    return response.data;
+  },
+  
+  async cancelRun(id: string) {
+    const response = await api.post(`/benchmarks/runs/${id}/cancel`);
+    return response.data;
   }
 };

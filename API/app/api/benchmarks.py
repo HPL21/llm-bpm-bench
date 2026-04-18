@@ -80,10 +80,26 @@ async def get_benchmark_runs(db: AsyncSession = Depends(get_db)):
     """
     Zwraca listę wszystkich uruchomień benchmarków.
     """
-    stmt = select(BenchmarkRun).order_by(BenchmarkRun.created_at.desc())
+    stmt = select(BenchmarkRun).options(
+        selectinload(BenchmarkRun.executions)
+    ).order_by(BenchmarkRun.created_at.desc())
+
     result = await db.execute(stmt)
     runs = result.scalars().all()
-    return runs
+
+    response = []
+    for run in runs:
+        response.append(
+            BenchmarkRunResponse(
+                id=run.id,
+                name=run.name,
+                status=run.status,
+                total_executions=len(run.executions),
+                created_at=run.created_at
+            )
+        )
+
+    return response
 
 
 @router.get("/runs/{run_id}", response_model=BenchmarkRunDetailResponse)

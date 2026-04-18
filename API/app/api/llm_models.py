@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.schemas.llm_model import LLMModelRead, LLMModelCreate, LLMModelUpdate
+from app.schemas.llm_model import LLMModelRead, LLMModelCreate, LLMModelUpdate, LLMModelTestRequest, LLMModelTestResponse
 from app.services.llm_service import LLMModelService
+from app.core.llm_clients import LLMClientFactory, LLMException
 
 router = APIRouter()
 
@@ -43,3 +44,23 @@ async def delete_model(model_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     success = await LLMModelService.delete_model(db, model_id)
     if not success:
         raise HTTPException(status_code=404, detail="Model not found")
+
+
+@router.post("/{model_id}/test", response_model=LLMModelTestResponse)
+async def test_model(
+    model_id: uuid.UUID,
+    request: LLMModelTestRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    model = await LLMModelService.get_model(db, model_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    try:
+        client = LLMClientFactory.get_client(model)
+        response = await client.generate(prompt=request.prompt)
+        return LLMModelTestResponse(success=True, response=response)
+    except LLMException as e:
+        return LLMModelTestResponse(success=False, error=str(e))
+    except Exception as e:
+        return LLMModelTestResponse(success=False, error=f"Nieoczekiwany błąd serwera: {str(e)}")

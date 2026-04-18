@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DatabaseIcon, FolderOpenIcon, CpuIcon } from 'lucide-vue-next'; // <--- DODANE CpuIcon
+import { DatabaseIcon, FolderOpenIcon, CpuIcon, ActivityIcon } from 'lucide-vue-next';
 </script>
 
 <template>
@@ -33,6 +33,13 @@ import { DatabaseIcon, FolderOpenIcon, CpuIcon } from 'lucide-vue-next'; // <---
             Modele LLM
           </router-link>
 
+
+          <router-link to="/benchmarks" class="px-4 py-2 rounded-md text-sm font-medium flex items-center transition-colors"
+            active-class="bg-slate-800 text-indigo-400"
+            inactive-class="text-gray-300 hover:bg-slate-800 hover:text-white">
+            <ActivityIcon class="w-4 h-4 mr-2" />
+            Ewaluacje
+          </router-link>
         </nav>
       </div>
     </header>

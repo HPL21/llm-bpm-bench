@@ -3,6 +3,8 @@ import FileManagerView from '../views/FileManagerView.vue';
 import TestSuitesView from '../views/TestSuitesView.vue';
 import TestCasesView from '../views/TestCasesView.vue';
 import ModelsView from '../views/ModelsView.vue';
+import BenchmarksView from '../views/BenchmarksView.vue';
+import BenchmarkDetailView from '../views/BenchmarkDetailView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -31,6 +33,17 @@ const router = createRouter({
       path: '/models',
       name: 'Models',
       component: ModelsView
+    },
+    {
+      path: '/benchmarks',
+      name: 'Benchmarks',
+      component: BenchmarksView
+    },
+    {
+      path: '/benchmarks/:id',
+      name: 'BenchmarkDetail',
+      component: BenchmarkDetailView,
+      props: true
     }
   ]
 });

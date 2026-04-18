@@ -34,3 +34,13 @@ class LLMModelRead(LLMModelBase):
     updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class LLMModelTestRequest(BaseModel):
+    prompt: str = Field(..., description="Treść zapytania (prompt) do przetestowania modelu")
+
+
+class LLMModelTestResponse(BaseModel):
+    success: bool
+    response: str | None = None
+    error: str | None = None
