@@ -67,6 +67,30 @@ services:
         reservations:
           memory: 256M
 
+
+  worker:
+    build:
+      context: ./API
+      dockerfile: Dockerfile
+    container_name: llm_worker
+    command: uv run python -m app.worker_main
+    volumes:
+      - ./API:/app
+      - /app/.venv
+    env_file:
+      - ./API/.env
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
 volumes:
   postgres_data:
   minio_data:
