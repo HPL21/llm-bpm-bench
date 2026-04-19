@@ -74,17 +74,17 @@ async def update_test_case(
 )
 async def import_cases_from_csv(
     suite_id: UUID,
-    collection_name: str = Form(...),
     file: UploadFile = File(...),
+    collection_name: str | None = Form(None),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Importuje przypadki testowe z pliku CSV.
-    Plik CSV musi zawierać kolumny: 'filenames' (oddzielone średnikami) i 'expected_response'.
-    Opcjonalnie może zawierać 'input_text' (domyślnie przyjmuje nazwy plików, jeśli brak).
+    Plik CSV musi zawierać kolumnę: 'expected_response'.
+    Opcjonalnie może zawierać 'input_text' oraz 'filenames' (oddzielone średnikami).
     Zwraca błąd 400 z listą brakujących plików, jeśli nie istnieją w podanej kolekcji.
     """
-    if not file.filename or file.filename.endswith('.csv'):
+    if not file.filename or not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Wymagany jest plik .csv")
 
     content = await file.read()
@@ -98,20 +98,26 @@ async def import_cases_from_csv(
     if not rows:
         raise HTTPException(status_code=400, detail="Plik CSV jest pusty.")
 
-    if not reader.fieldnames or 'filenames' not in reader.fieldnames or 'expected_response' not in reader.fieldnames:
+    if not reader.fieldnames or 'expected_response' not in reader.fieldnames:
         raise HTTPException(
             status_code=400,
-            detail="Plik CSV musi zawierać nagłówki: 'filenames' oraz 'expected_response'."
+            detail="Plik CSV musi zawierać nagłówek: 'expected_response'."
         )
 
     required_filenames = set()
-    for row in rows:
-        if row.get('filenames'):
-            files = [f.strip() for f in row['filenames'].split('###') if f.strip()]
-            required_filenames.update(files)
+    if 'filenames' in reader.fieldnames:
+        for row in rows:
+            if row.get('filenames'):
+                files = [f.strip() for f in row['filenames'].split('###') if f.strip()]
+                required_filenames.update(files)
 
     file_map = {}
     if required_filenames:
+        if not collection_name:
+            raise HTTPException(
+                status_code=400,
+                detail="Plik CSV odwołuje się do plików, ale nie wybrano kolekcji."
+            )
         result = await db.execute(
             select(FileAsset)
             .where(FileAsset.collection_name == collection_name)
@@ -135,11 +141,16 @@ async def import_cases_from_csv(
     created_cases = []
     for row in rows:
         file_ids = []
-        if row.get('filenames'):
+        if 'filenames' in reader.fieldnames and row.get('filenames'):
             files = [f.strip() for f in row['filenames'].split(';') if f.strip()]
             file_ids = [file_map[f] for f in files if f in file_map]
 
-        input_text = row.get('input_text') or f"Przetwórz pliki: {row.get('filenames', '')}"
+        input_text = row.get('input_text')
+        if not input_text:
+            if 'filenames' in reader.fieldnames and row.get('filenames'):
+                input_text = f"Przetwórz pliki: {row.get('filenames', '')}"
+            else:
+                input_text = "Brak podanego wejścia"
 
         case_in = TestCaseCreate(
             suite_id=suite_id,

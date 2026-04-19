@@ -43,7 +43,7 @@ const submit = async () => {
 </script>
 
 <template>
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 transition-all">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
       <div class="flex justify-between items-center p-4 border-b">
         <h2 class="text-lg font-semibold">Nowe Uruchomienie Benchmarku</h2>
