@@ -109,10 +109,12 @@ async def get_benchmark_run_details(run_id: UUID, db: AsyncSession = Depends(get
     oraz zwraca listę wszystkich egzekucji.
     """
     stmt = select(BenchmarkRun).where(BenchmarkRun.id == run_id).options(
-        selectinload(BenchmarkRun.executions)
+        selectinload(BenchmarkRun.executions).joinedload(BenchmarkExecution.llm_model),
+        selectinload(BenchmarkRun.executions).joinedload(BenchmarkExecution.test_case)
     )
     result = await db.execute(stmt)
     run = result.scalar_one_or_none()
+
     if not run:
         raise HTTPException(status_code=404, detail="Nie znaleziono takiego benchmarku.")
 

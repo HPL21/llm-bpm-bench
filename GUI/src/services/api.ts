@@ -193,6 +193,9 @@ export interface BenchmarkExecution {
   completion_tokens: number | null;
   latency_ms: number | null;
   updated_at: string;
+  created_at?: string;
+  llm_model_name?: string; 
+  expected_output?: string | null;
 }
 
 export interface BenchmarkRunDetail extends BenchmarkRun {

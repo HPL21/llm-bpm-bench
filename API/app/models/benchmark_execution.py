@@ -7,6 +7,8 @@ from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.benchmark_run import BenchmarkRun
+    from app.models.llm_model import LLMModel
+    from app.models.test_case import TestCase
 
 
 class ExecutionStatus(str, enum.Enum):
@@ -46,6 +48,16 @@ class BenchmarkExecution(Base):
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     run: Mapped["BenchmarkRun"] = relationship(back_populates="executions")
+    llm_model: Mapped["LLMModel"] = relationship("LLMModel")
+    test_case: Mapped["TestCase"] = relationship("TestCase")
+
+    @property
+    def llm_model_name(self) -> str:
+        return self.llm_model.name if self.llm_model else "Nieznany model"
+
+    @property
+    def expected_output(self) -> str | None:
+        return self.test_case.expected_output if self.test_case else None
 
     def __repr__(self) -> str:
         return f"<BenchmarkExecution(id={self.id}, status='{self.status}')>"

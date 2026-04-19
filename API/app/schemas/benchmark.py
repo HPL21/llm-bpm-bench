@@ -35,6 +35,8 @@ class BenchmarkExecutionResponse(BaseModel):
     completion_tokens: Optional[int] = None
     latency_ms: Optional[int] = None
     updated_at: datetime
+    llm_model_name: Optional[str] = None
+    expected_output: Optional[str] = None
 
     class Config:
         from_attributes = True
