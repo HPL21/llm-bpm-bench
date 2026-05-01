@@ -37,7 +37,7 @@ class BaseLLMClient(ABC):
         self.timeout = httpx.Timeout(300.0, connect=10.0)
 
     @abstractmethod
-    async def generate(self, prompt: str, system_prompt: str | None = None) -> str:
+    async def generate(self, prompt: str, system_prompt: str | None = None, images: list[dict] | None = None) -> str:
         pass
 
     async def _safe_post(self, url: str, **kwargs) -> httpx.Response:
@@ -77,11 +77,23 @@ class BaseLLMClient(ABC):
 
 
 class OpenAICompatibleClient(BaseLLMClient):
-    async def generate(self, prompt: str, system_prompt: str | None = None) -> str:
+    async def generate(self, prompt: str, system_prompt: str | None = None, images: list[dict] | None = None) -> str:
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
+
+        if images:
+            content_list = [{"type": "text", "text": prompt}]
+            for img in images:
+                content_list.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{img['mime_type']};base64,{img['content']}"
+                    }
+                })  # type: ignore
+            messages.append({"role": "user", "content": content_list})
+        else:
+            messages.append({"role": "user", "content": prompt})
 
         headers = {"Content-Type": "application/json"}
         if self.model_config.api_key:
@@ -108,15 +120,19 @@ class OpenAICompatibleClient(BaseLLMClient):
 
 
 class OllamaClient(BaseLLMClient):
-    async def generate(self, prompt: str, system_prompt: str | None = None) -> str:
+    async def generate(self, prompt: str, system_prompt: str | None = None, images: list[dict] | None = None) -> str:
         payload = {
             "model": self.model_name,
             "prompt": prompt,
             "stream": False,
             "options": self.model_config.parameters
         }
+
         if system_prompt:
             payload["system"] = system_prompt
+
+        if images:
+            payload["images"] = [img["content"] for img in images]
 
         response = await self._safe_post(
             f"{self.base_url}/api/generate",

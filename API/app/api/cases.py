@@ -89,7 +89,7 @@ async def import_cases_from_csv(
 
     content = await file.read()
     try:
-        text = content.decode("utf-8")
+        text = content.decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(text), delimiter=";")
     except Exception:
         raise HTTPException(status_code=400, detail="Nie udało się zdekodować pliku CSV.")
@@ -142,20 +142,15 @@ async def import_cases_from_csv(
     for row in rows:
         file_ids = []
         if 'filenames' in reader.fieldnames and row.get('filenames'):
-            files = [f.strip() for f in row['filenames'].split(';') if f.strip()]
+            files = [f.strip() for f in row['filenames'].split('###') if f.strip()]
             file_ids = [file_map[f] for f in files if f in file_map]
 
-        input_text = row.get('input_text')
-        if not input_text:
-            if 'filenames' in reader.fieldnames and row.get('filenames'):
-                input_text = f"Przetwórz pliki: {row.get('filenames', '')}"
-            else:
-                input_text = "Brak podanego wejścia"
+        input_text = row.get('input_text', "")
 
         case_in = TestCaseCreate(
             suite_id=suite_id,
             input_text=input_text,
-            expected_output=row['expected_response'],
+            expected_output=row['expected_response'].strip('\"'),
             file_ids=file_ids
         )
         created = await case_service.create(db, case_in)
