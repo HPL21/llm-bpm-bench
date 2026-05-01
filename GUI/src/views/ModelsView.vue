@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { CpuIcon, PlusIcon, EditIcon, Trash2Icon, CheckCircle2Icon, XCircleIcon, MessageSquareIcon, XIcon } from 'lucide-vue-next';
 import { ModelService, type LLMModel, type LLMModelCreate } from '../services/api';
 import ModelModal from '../components/models/ModelModal.vue';
@@ -96,7 +96,25 @@ const runTest = async () => {
   }
 };
 
-onMounted(loadModels);
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    if (isModalOpen.value) {
+      isModalOpen.value = false;
+    }
+    if (testModalOpen.value) {
+      closeTestModal();
+    }
+  }
+};
+
+onMounted(() => {
+  loadModels();
+  window.addEventListener('keydown', handleKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown);
+});
 </script>
 
 <template>

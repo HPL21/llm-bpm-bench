@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { XIcon } from 'lucide-vue-next';
 import type { LLMModelCreate, LLMModel } from '../../services/api';
 
@@ -56,6 +56,21 @@ const handleSave = () => {
     emit('save', { ...formData.value, parameters: parsedParams });
   }
 };
+
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    emit('close');
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown);
+});
+
 </script>
 
 <template>

@@ -11,11 +11,13 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",
     "axios": "^1.14.0",
+    "diff": "^9.0.0",
     "lucide-vue-next": "^1.0.0",
     "vue": "^3.5.30",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@types/diff": "^7.0.2",
     "@types/node": "^24.12.0",
     "@vitejs/plugin-vue": "^6.0.5",
     "@vue/tsconfig": "^0.9.0",

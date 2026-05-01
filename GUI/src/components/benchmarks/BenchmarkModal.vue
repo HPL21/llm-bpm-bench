@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { ModelService, SuiteService, BenchmarkService, type LLMModel, type TestSuite } from '../../services/api';
 import { XIcon, PlayIcon } from 'lucide-vue-next';
 
@@ -40,6 +40,22 @@ const submit = async () => {
     isSubmitting.value = false;
   }
 };
+
+
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    emit('close');
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown);
+});
+
 </script>
 
 <template>

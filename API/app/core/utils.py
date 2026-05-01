@@ -23,6 +23,6 @@ def clean_llm_response(response: str, verification_method: str) -> str:
     cleaned = "\n".join(filtered_lines).strip()
 
     if verification_method == "JSON_COMPARE":
-        cleaned = json_repair.repair_json(cleaned)
+        cleaned = json_repair.repair_json(cleaned, ensure_ascii=False)
 
     return cleaned

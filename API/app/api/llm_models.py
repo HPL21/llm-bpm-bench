@@ -59,7 +59,7 @@ async def test_model(
     try:
         client = LLMClientFactory.get_client(model)
         response = await client.generate(prompt=request.prompt)
-        return LLMModelTestResponse(success=True, response=response)
+        return LLMModelTestResponse(success=True, response=response[0])
     except LLMException as e:
         return LLMModelTestResponse(success=False, error=str(e))
     except Exception as e:

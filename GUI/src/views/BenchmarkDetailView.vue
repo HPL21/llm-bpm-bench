@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { BenchmarkService, type BenchmarkRunDetail, type BenchmarkExecution } from '../services/api';
 import { ArrowLeftIcon, BanIcon, RefreshCwIcon, EyeIcon, XIcon } from 'lucide-vue-next';
+import * as Diff from 'diff';
 
 interface BenchmarkSummaryRow {
   model: string;
@@ -72,9 +73,9 @@ const formatDate = (dateString?: string) => {
 
 onMounted(async () => {
   await fetchDetails();
-  
+
   window.addEventListener('keydown', handleKeydown);
-  
+
   pollInterval = window.setInterval(() => {
     if (run.value && ['PENDING', 'PROCESSING'].includes(run.value.status)) {
       fetchDetails();
@@ -102,23 +103,44 @@ const getStatusColor = (status: string) => {
     default: return 'text-gray-600 bg-gray-100';
   }
 };
+
+const formatIfJson = (str?: string | null) => {
+  if (!str) return '';
+  try {
+    const parsed = JSON.parse(str);
+    return JSON.stringify(parsed, null, 2);
+  } catch (e) {
+    return str;
+  }
+};
+
+const diffResult = computed(() => {
+  if (!selectedExecution.value) return [];
+
+  const expected = formatIfJson(selectedExecution.value.expected_output);
+  const received = formatIfJson(selectedExecution.value.response_text);
+
+  return Diff.diffLines(expected, received);
+});
+
 </script>
 
 <template>
   <div class="h-full flex flex-col p-6 bg-gray-50 overflow-y-auto">
     <div v-if="loading" class="flex justify-center items-center h-full">Ładowanie...</div>
-    
+
     <div v-else-if="run" class="max-w-7xl mx-auto w-full space-y-6">
-      
+
       <div class="flex justify-between items-start">
         <div>
-          <button @click="router.push('/benchmarks')" class="text-sm text-gray-500 hover:text-indigo-600 flex items-center mb-2">
+          <button @click="router.push('/benchmarks')"
+            class="text-sm text-gray-500 hover:text-indigo-600 flex items-center mb-2">
             <ArrowLeftIcon class="w-4 h-4 mr-1" /> Wróć do listy
           </button>
           <h1 class="text-2xl font-bold text-gray-900">{{ run.name || 'Nienazwany benchmark' }}</h1>
           <p class="text-sm text-gray-500">ID: {{ run.id }} | Utworzono: {{ formatDate(run.created_at) }}</p>
         </div>
-        
+
         <div class="flex items-center space-x-3">
           <span :class="['px-3 py-1 text-sm font-semibold rounded-full', getStatusColor(run.status)]">
             {{ run.status }}
@@ -126,7 +148,8 @@ const getStatusColor = (status: string) => {
           <button @click="fetchDetails" class="p-2 bg-white border rounded hover:bg-gray-50" title="Odśwież">
             <RefreshCwIcon class="w-4 h-4 text-gray-600" />
           </button>
-          <button v-if="['PENDING', 'PROCESSING'].includes(run.status)" @click="cancelRun" class="flex items-center px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 text-sm font-medium">
+          <button v-if="['PENDING', 'PROCESSING'].includes(run.status)" @click="cancelRun"
+            class="flex items-center px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 text-sm font-medium">
             <BanIcon class="w-4 h-4 mr-1" /> Anuluj
           </button>
         </div>
@@ -138,7 +161,8 @@ const getStatusColor = (status: string) => {
           <span>{{ run.completed_executions + run.failed_executions }} / {{ run.total_executions }}</span>
         </div>
         <div class="w-full bg-gray-200 rounded-full h-2.5 mb-6">
-          <div class="bg-indigo-600 h-2.5 rounded-full transition-all duration-500" :style="{ width: progress + '%' }"></div>
+          <div class="bg-indigo-600 h-2.5 rounded-full transition-all duration-500" :style="{ width: progress + '%' }">
+          </div>
         </div>
 
         <div class="grid grid-cols-4 gap-4 text-center">
@@ -181,13 +205,15 @@ const getStatusColor = (status: string) => {
                 <td colspan="5" class="px-5 py-6 text-center text-gray-500">Ładowanie podsumowania...</td>
               </tr>
               <tr v-else-if="summaryData.length === 0">
-                <td colspan="5" class="px-5 py-6 text-center text-gray-500">Brak danych (poczekaj na zakończenie pierwszych egzekucji).</td>
+                <td colspan="5" class="px-5 py-6 text-center text-gray-500">Brak danych (poczekaj na zakończenie
+                  pierwszych egzekucji).</td>
               </tr>
               <tr v-else v-for="(row, idx) in summaryData" :key="idx" class="hover:bg-gray-50">
                 <td class="px-5 py-3 font-medium text-gray-800">{{ row.model }}</td>
                 <td class="px-5 py-3 text-gray-600">{{ row.test_suite }}</td>
                 <td class="px-5 py-3 text-center">
-                  <span :class="{'text-green-600 font-bold': row.avg_correctness >= 80, 'text-yellow-600 font-bold': row.avg_correctness >= 50 && row.avg_correctness < 80, 'text-red-600 font-bold': row.avg_correctness < 50}">
+                  <span
+                    :class="{ 'text-green-600 font-bold': row.avg_correctness >= 80, 'text-yellow-600 font-bold': row.avg_correctness >= 50 && row.avg_correctness < 80, 'text-red-600 font-bold': row.avg_correctness < 50 }">
                     {{ row.avg_correctness }}%
                   </span>
                 </td>
@@ -230,7 +256,8 @@ const getStatusColor = (status: string) => {
                   </span>
                 </td>
                 <td class="px-5 py-3 text-center">
-                  <span v-if="exec.score !== null" class="font-bold" :class="exec.score > 0.8 ? 'text-green-600' : 'text-yellow-600'">
+                  <span v-if="exec.score !== null" class="font-bold"
+                    :class="exec.score > 0.8 ? 'text-green-600' : 'text-yellow-600'">
                     {{ (exec.score * 100).toFixed(1) }}%
                   </span>
                   <span v-else class="text-gray-400">-</span>
@@ -248,7 +275,8 @@ const getStatusColor = (status: string) => {
                 </td>
               </tr>
               <tr v-if="run.executions.length === 0">
-                <td colspan="7" class="px-5 py-6 text-center text-gray-500">Brak danych o wykonaniach w tym benchmarku.</td>
+                <td colspan="7" class="px-5 py-6 text-center text-gray-500">Brak danych o wykonaniach w tym benchmarku.
+                </td>
               </tr>
             </tbody>
           </table>
@@ -256,41 +284,62 @@ const getStatusColor = (status: string) => {
       </div>
     </div>
 
-    <div 
-      v-if="selectedExecution" 
+    <div v-if="selectedExecution"
       class="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all"
-      @click.self="closeModal"
-    >
+      @click.self="closeModal">
       <div class="bg-white rounded-lg shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col border border-white/20">
         <div class="flex justify-between items-center p-5 border-b">
           <h3 class="text-lg font-bold text-gray-900">
-            Podgląd odpowiedzi — {{ selectedExecution.llm_model_name || selectedExecution.llm_model_id.substring(0,8) }}
+            Podgląd odpowiedzi — {{ selectedExecution.llm_model_name || selectedExecution.llm_model_id.substring(0, 8) }}
           </h3>
           <button @click="closeModal" class="text-gray-400 hover:text-gray-600 transition-colors">
             <XIcon class="w-6 h-6" />
           </button>
         </div>
-        
+
         <div class="p-5 overflow-y-auto space-y-6 flex-1">
-          <div>
-            <h4 class="text-sm font-semibold text-gray-700 mb-2">Oczekiwana odpowiedź (z Test Case'u):</h4>
-            <div class="bg-gray-50 p-4 rounded-md border border-gray-200 text-sm font-mono whitespace-pre-wrap min-h-[100px]">
-              {{ selectedExecution.expected_output || 'Brak zdefiniowanej oczekiwanej odpowiedzi.' }}
+          <div class="p-5 overflow-y-auto space-y-6 flex-1">
+            <div>
+              <h4 class="text-sm font-semibold text-gray-700 mb-2">Różnice:</h4>
+              <div
+                class="bg-gray-900 p-4 rounded-md border border-gray-700 text-sm font-mono whitespace-pre-wrap min-h-[100px] overflow-x-auto leading-relaxed">
+                <template v-if="diffResult.length > 0">
+                  <span v-for="(part, index) in diffResult" :key="index" :class="{
+                    'bg-red-900/50 text-red-300 block w-full px-1': part.removed,
+                    'bg-green-900/50 text-green-300 block w-full px-1': part.added,
+                    'text-gray-300': !part.added && !part.removed
+                  }">{{ part.value }}</span>
+                </template>
+                <span v-else class="text-gray-500 italic">Brak danych do porównania.</span>
+              </div>
             </div>
           </div>
-          <div>
-            <h4 class="text-sm font-semibold text-gray-700 mb-2">Otrzymana odpowiedź (Model LLM):</h4>
-            <div class="bg-blue-50/30 p-4 rounded-md border border-blue-100 text-sm font-mono whitespace-pre-wrap min-h-[100px]">
-              {{ selectedExecution.response_text || 'Brak odpowiedzi.' }}
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <h4 class="text-sm font-semibold text-gray-700 mb-2">Oczekiwana odpowiedź:</h4>
+              <div
+                class="bg-gray-50 p-4 rounded-md border border-gray-200 text-sm font-mono whitespace-pre-wrap min-h-[100px] overflow-x-auto">
+                {{ formatIfJson(selectedExecution.expected_output) || 'Brak' }}
+              </div>
+            </div>
+            <div>
+              <h4 class="text-sm font-semibold text-gray-700 mb-2">Otrzymana odpowiedź:</h4>
+              <div
+                class="bg-blue-50/30 p-4 rounded-md border border-blue-100 text-sm font-mono whitespace-pre-wrap min-h-[100px] overflow-x-auto">
+                {{ formatIfJson(selectedExecution.response_text) || 'Brak' }}
+              </div>
             </div>
           </div>
         </div>
 
         <div class="p-4 border-t bg-gray-50 flex justify-between items-center">
           <span class="text-sm text-gray-500">
-            Wynik: <span class="font-bold text-gray-700">{{ selectedExecution.score !== null ? (selectedExecution.score * 100).toFixed(1) + '%' : 'Brak oceny' }}</span>
+            Wynik: <span class="font-bold text-gray-700">{{ selectedExecution.score !== null ? (selectedExecution.score
+              *
+              100).toFixed(1) + '%' : 'Brak oceny' }}</span>
           </span>
-          <button @click="closeModal" class="px-6 py-2 bg-white border rounded-md hover:bg-gray-50 font-medium shadow-sm transition-colors">
+          <button @click="closeModal"
+            class="px-6 py-2 bg-white border rounded-md hover:bg-gray-50 font-medium shadow-sm transition-colors">
             Zamknij (ESC)
           </button>
         </div>
