@@ -16,7 +16,9 @@ class SuiteService:
     async def get_all(self, db: AsyncSession) -> Sequence[TestSuite]:
         """Fetch all test suites."""
         result = await db.execute(
-            select(TestSuite).order_by(TestSuite.created_at.desc())
+            select(TestSuite)
+            .where(TestSuite.is_deleted.is_not(True))
+            .order_by(TestSuite.created_at.desc())
         )
         return result.scalars().all()
 
@@ -31,6 +33,8 @@ class SuiteService:
             name=schema.name,
             description=schema.description,
             system_prompt=schema.system_prompt,
+            verification_method=schema.verification_method,
+            parameters=schema.parameters
         )
         db.add(db_obj)
         await db.commit()
@@ -45,6 +49,14 @@ class SuiteService:
         for field, value in update_data.items():
             setattr(suite, field, value)
 
+        db.add(suite)
+        await db.commit()
+        await db.refresh(suite)
+        return suite
+
+    async def deactivate(self, db: AsyncSession, suite: TestSuite) -> TestSuite:
+        """Deactivate (soft delete) a test suite."""
+        suite.is_deleted = True
         db.add(suite)
         await db.commit()
         await db.refresh(suite)

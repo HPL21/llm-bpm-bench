@@ -1,7 +1,7 @@
 import uuid
 from typing import List
 
-from sqlalchemy import Column, ForeignKey, Table, Text, Uuid
+from sqlalchemy import Column, ForeignKey, Table, Text, Uuid, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -45,6 +45,7 @@ class TestCase(Base):
     )
     input_text: Mapped[str] = mapped_column(Text, nullable=False)
     expected_output: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     files: Mapped[List[FileAsset]] = relationship(
         "FileAsset",

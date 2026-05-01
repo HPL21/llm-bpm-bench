@@ -48,7 +48,7 @@ const handleSaveSuite = async (data: TestSuiteCreate) => {
 };
 
 const handleDelete = async (id: string) => {
-  if (!confirm("Czy na pewno chcesz usunąć ten zbiór? Usunie to również wszystkie przypisane przypadki testowe (wkrótce).")) return;
+  if (!confirm("Czy na pewno chcesz usunąć ten zbiór?")) return;
   try {
     await SuiteService.deleteSuite(id);
     await loadSuites();

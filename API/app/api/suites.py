@@ -81,4 +81,4 @@ async def delete_suite(
     if not suite:
         raise HTTPException(status_code=404, detail="Test Suite not found")
 
-    await suite_service.delete(db, suite)
+    await suite_service.deactivate(db, suite)

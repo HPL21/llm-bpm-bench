@@ -47,45 +47,46 @@ const getStatusColor = (status: string) => {
         Nowy Benchmark
       </button>
     </div>
-
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nazwa</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Liczba Zadań</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Utworzenia</th>
-            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Akcje</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="run in runs" :key="run.id" class="hover:bg-gray-50 cursor-pointer" @click="router.push(`/benchmarks/${run.id}`)">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-              {{ run.name }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span :class="['px-2 inline-flex text-xs leading-5 font-semibold rounded-full', getStatusColor(run.status)]">
-                {{ run.status }}
-              </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ run.total_executions }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ new Date(run.created_at).toLocaleString() }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-              <ChevronRightIcon class="w-5 h-5 text-gray-400 inline-block" />
-            </td>
-          </tr>
-          <tr v-if="runs.length === 0">
-            <td colspan="5" class="px-6 py-8 text-center text-gray-500">
-              Brak uruchomień benchmarków. Kliknij "Nowy Benchmark" aby rozpocząć.
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div class="overflow-auto flex-1">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50 sticky top-0 z-10 shadow-sm">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nazwa</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Liczba Zadań</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Utworzenia</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Akcje</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr v-for="run in runs" :key="run.id" class="hover:bg-gray-50 cursor-pointer" @click="router.push(`/benchmarks/${run.id}`)">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                {{ run.name }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span :class="['px-2 inline-flex text-xs leading-5 font-semibold rounded-full', getStatusColor(run.status)]">
+                  {{ run.status }}
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ run.total_executions }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ new Date(run.created_at).toLocaleString() }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <ChevronRightIcon class="w-5 h-5 text-gray-400 inline-block" />
+              </td>
+            </tr>
+            <tr v-if="runs.length === 0">
+              <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                Brak uruchomień benchmarków. Kliknij "Nowy Benchmark" aby rozpocząć.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <BenchmarkModal v-if="showModal" @close="showModal = false" @created="handleCreated" />

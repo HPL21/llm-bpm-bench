@@ -1,7 +1,7 @@
 import uuid
 import enum
 from typing import TYPE_CHECKING
-from sqlalchemy import String, Enum, Uuid
+from sqlalchemy import String, Enum, Uuid, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
@@ -32,6 +32,7 @@ class BenchmarkRun(Base):
     executions: Mapped[list["BenchmarkExecution"]] = relationship(
         back_populates="run", cascade="all, delete-orphan"
     )
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     def __repr__(self) -> str:
         return f"<BenchmarkRun(id={self.id}, name='{self.name}', status='{self.status}')>"

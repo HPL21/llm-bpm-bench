@@ -6,7 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class TestSuiteBase(BaseModel):
     """Shared properties for Test Suites."""
-
     name: str = Field(
         ..., min_length=1, max_length=200, description="Name of the test suite"
     )
@@ -27,13 +26,11 @@ class TestSuiteBase(BaseModel):
 
 class TestSuiteCreate(TestSuiteBase):
     """Properties to receive on item creation."""
-
     pass
 
 
 class TestSuiteUpdate(BaseModel):
     """Properties to receive on item update."""
-
     name: str | None = None
     description: str | None = None
     system_prompt: str | None = None
@@ -43,9 +40,7 @@ class TestSuiteUpdate(BaseModel):
 
 class TestSuiteRead(TestSuiteBase):
     """Properties to return to client."""
-
     id: UUID
     created_at: datetime
     updated_at: datetime | None = None
-
     model_config = ConfigDict(from_attributes=True)
