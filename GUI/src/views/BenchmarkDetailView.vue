@@ -4,11 +4,23 @@ import { useRouter } from 'vue-router';
 import { BenchmarkService, type BenchmarkRunDetail, type BenchmarkExecution } from '../services/api';
 import { ArrowLeftIcon, BanIcon, RefreshCwIcon, EyeIcon, XIcon } from 'lucide-vue-next';
 
+interface BenchmarkSummaryRow {
+  model: string;
+  test_suite: string;
+  avg_correctness: number;
+  avg_time: number;
+  avg_tokens: number;
+}
+
 const props = defineProps<{ id: string }>();
 const router = useRouter();
 
 const run = ref<BenchmarkRunDetail | null>(null);
+const summaryData = ref<BenchmarkSummaryRow[]>([]);
+
 const loading = ref(true);
+const loadingSummary = ref(true);
+
 const selectedExecution = ref<BenchmarkExecution | null>(null);
 let pollInterval: number;
 
@@ -22,9 +34,20 @@ const handleKeydown = (e: KeyboardEvent) => {
   }
 };
 
+const fetchSummary = async () => {
+  try {
+    summaryData.value = await BenchmarkService.getRunSummary(props.id);
+  } catch (error) {
+    console.error("Error fetching run summary:", error);
+  } finally {
+    loadingSummary.value = false;
+  }
+};
+
 const fetchDetails = async () => {
   try {
     run.value = await BenchmarkService.getRunDetails(props.id);
+    await fetchSummary();
   } catch (error) {
     console.error("Error fetching run details:", error);
   } finally {
@@ -135,6 +158,44 @@ const getStatusColor = (status: string) => {
             <div class="text-2xl font-bold text-red-700">{{ run.failed_executions }}</div>
             <div class="text-xs text-red-600 uppercase tracking-wide">Błędy</div>
           </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <div class="px-5 py-4 border-b">
+          <h2 class="font-medium text-gray-800">Podsumowanie Wyników</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50 text-gray-500">
+              <tr>
+                <th class="px-5 py-3 text-left font-medium">Model LLM</th>
+                <th class="px-5 py-3 text-left font-medium">Zbiór testowy</th>
+                <th class="px-5 py-3 text-center font-medium">Średnia poprawność</th>
+                <th class="px-5 py-3 text-right font-medium">Średni czas (s)</th>
+                <th class="px-5 py-3 text-right font-medium">Średnio tokenów</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <tr v-if="loadingSummary">
+                <td colspan="5" class="px-5 py-6 text-center text-gray-500">Ładowanie podsumowania...</td>
+              </tr>
+              <tr v-else-if="summaryData.length === 0">
+                <td colspan="5" class="px-5 py-6 text-center text-gray-500">Brak danych (poczekaj na zakończenie pierwszych egzekucji).</td>
+              </tr>
+              <tr v-else v-for="(row, idx) in summaryData" :key="idx" class="hover:bg-gray-50">
+                <td class="px-5 py-3 font-medium text-gray-800">{{ row.model }}</td>
+                <td class="px-5 py-3 text-gray-600">{{ row.test_suite }}</td>
+                <td class="px-5 py-3 text-center">
+                  <span :class="{'text-green-600 font-bold': row.avg_correctness >= 80, 'text-yellow-600 font-bold': row.avg_correctness >= 50 && row.avg_correctness < 80, 'text-red-600 font-bold': row.avg_correctness < 50}">
+                    {{ row.avg_correctness }}%
+                  </span>
+                </td>
+                <td class="px-5 py-3 text-right text-gray-600 font-mono">{{ row.avg_time }} s</td>
+                <td class="px-5 py-3 text-right text-gray-600 font-mono">{{ row.avg_tokens }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 

@@ -224,5 +224,10 @@ export const BenchmarkService = {
   async cancelRun(id: string) {
     const response = await api.post(`/benchmarks/runs/${id}/cancel`);
     return response.data;
-  }
+  },
+
+  async getRunSummary(runId: string) {
+    const response = await api.get(`/benchmarks/runs/${runId}/summary`);
+    return response.data;
+  },
 };

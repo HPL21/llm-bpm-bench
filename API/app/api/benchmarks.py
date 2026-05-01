@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
 from typing import List, Any
 from uuid import UUID
 from app.core.database import get_db
 from app.models.benchmark_run import BenchmarkRun, RunStatus
 from app.models.benchmark_execution import BenchmarkExecution, ExecutionStatus
+from app.models.llm_model import LLMModel
 from app.models.test_case import TestCase
+from app.models.test_suite import TestSuite
 from app.schemas.benchmark import (
     BenchmarkRunCreate,
     BenchmarkRunResponse,
@@ -174,3 +176,47 @@ async def cancel_benchmark_run(run_id: UUID, db: AsyncSession = Depends(get_db))
     await db.commit()
 
     return {"message": "Benchmark został pomyślnie anulowany."}
+
+
+@router.get("/runs/{run_id}/summary")
+async def get_benchmark_summary(run_id: UUID, db: AsyncSession = Depends(get_db)):
+    """
+    Zwraca zagregowane podsumowanie dla danego uruchomienia benchmarku:
+    średnią poprawność, czas i zużycie tokenów pogrupowane po modelu i zbiorze testowym.
+    """
+
+    stmt = (
+        select(
+            LLMModel.name.label("model_name"),
+            TestSuite.name.label("suite_name"),
+            func.avg(BenchmarkExecution.score).label("avg_score"),
+            (func.avg(BenchmarkExecution.latency_ms) / 1000.0).label("avg_time"),
+            func.avg(
+                func.coalesce(BenchmarkExecution.prompt_tokens, 0) +
+                func.coalesce(BenchmarkExecution.completion_tokens, 0)
+            ).label("avg_tokens")
+        )
+        .join(LLMModel, BenchmarkExecution.llm_model_id == LLMModel.id)
+        .join(TestCase, BenchmarkExecution.test_case_id == TestCase.id)
+        .join(TestSuite, TestCase.suite_id == TestSuite.id)
+        .where(BenchmarkExecution.run_id == run_id)
+        .where(BenchmarkExecution.status.in_([ExecutionStatus.COMPLETED, ExecutionStatus.FAILED]))
+        .group_by(LLMModel.name, TestSuite.name)
+    )
+
+    result = await db.execute(stmt)
+    summary = result.all()
+
+    if not summary:
+        return []
+
+    return [
+        {
+            "model": row.model_name,
+            "test_suite": row.suite_name,
+            "avg_correctness": round((row.avg_score or 0) * 100, 2),
+            "avg_time": round(row.avg_time or 0, 2),
+            "avg_tokens": round(row.avg_tokens or 0, 0)
+        }
+        for row in summary
+    ]
