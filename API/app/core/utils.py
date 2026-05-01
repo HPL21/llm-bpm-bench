@@ -1,8 +1,12 @@
-def clean_llm_response(response: str) -> str:
+import json_repair
+
+
+def clean_llm_response(response: str, verification_method: str) -> str:
     """
     Cleans LLM response by:
     1. Removing everything up to and including </think> tag (if present)
     2. Removing triple backticks (e.g. ```json ... ```)
+    3. Repairing JSON formatting if verification_method is "JSON_COMPARE"
     """
 
     cleaned: str = response
@@ -16,6 +20,9 @@ def clean_llm_response(response: str) -> str:
         line for line in lines if not line.strip().startswith("```")
     ]
 
-    cleaned = "\n".join(filtered_lines)
+    cleaned = "\n".join(filtered_lines).strip()
 
-    return cleaned.strip()
+    if verification_method == "JSON_COMPARE":
+        cleaned = json_repair.repair_json(cleaned)
+
+    return cleaned

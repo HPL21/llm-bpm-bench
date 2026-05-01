@@ -18,7 +18,7 @@ from app.models.llm_model import LLMModel
 from app.models.file_asset import FileAsset
 from app.core.llm_clients import LLMClientFactory, LLMException
 from app.core.utils import clean_llm_response
-from app.services.evaluation_service import EvaluationService
+from app.services.evaluation_service import EvaluationService, EvaluationException
 from app.services.storage_service import storage_service
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -141,7 +141,7 @@ async def process_single_execution(execution_id: uuid.UUID):
 
             start_time = asyncio.get_event_loop().time()
 
-            response_text = await client.generate(
+            response_text, prompt_tokens, completion_tokens = await client.generate(
                 prompt=combined_prompt,
                 system_prompt=test_suite.system_prompt,
                 images=images_list if images_list else None
@@ -150,7 +150,7 @@ async def process_single_execution(execution_id: uuid.UUID):
             end_time = asyncio.get_event_loop().time()
             latency_ms = int((end_time - start_time) * 1000)
             expected_text = test_case.expected_output or ""
-            cleaned_response_text = clean_llm_response(response_text)
+            cleaned_response_text = clean_llm_response(response_text, test_suite.verification_method)
 
             score, eval_details = await EvaluationService.evaluate(
                 verification_method=test_suite.verification_method,
@@ -161,6 +161,8 @@ async def process_single_execution(execution_id: uuid.UUID):
             execution.response_text = cleaned_response_text
             execution.score = score
             execution.latency_ms = latency_ms
+            execution.prompt_tokens = prompt_tokens
+            execution.completion_tokens = completion_tokens
             execution.status = ExecutionStatus.COMPLETED
 
             if "reason" in eval_details:
@@ -174,6 +176,16 @@ async def process_single_execution(execution_id: uuid.UUID):
 
         except LLMException as e:
             logger.error(f"Błąd klienta LLM dla [{execution_id}]: {str(e)}")
+            execution.status = ExecutionStatus.FAILED
+            execution.error_message = str(e)
+            await db.commit()
+
+        except EvaluationException as e:
+            logger.error(f"Błąd weryfikacji odpowiedzi [{execution_id}]: {str(e)}")
+            execution.response_text = cleaned_response_text
+            execution.latency_ms = latency_ms
+            execution.prompt_tokens = prompt_tokens
+            execution.completion_tokens = completion_tokens
             execution.status = ExecutionStatus.FAILED
             execution.error_message = str(e)
             await db.commit()

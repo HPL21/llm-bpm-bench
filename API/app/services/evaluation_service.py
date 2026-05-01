@@ -5,6 +5,10 @@ from rapidfuzz import fuzz, utils
 from app.core.llm_clients import BaseLLMClient
 
 
+class EvaluationException(Exception):
+    pass
+
+
 class EvaluationService:
     @staticmethod
     def evaluate_exact_match(expected: str, actual: str) -> Tuple[float, Dict[str, Any]]:
@@ -25,7 +29,7 @@ class EvaluationService:
             expected_json = json.loads(expected)
             actual_json = json.loads(actual)
         except json.JSONDecodeError:
-            return 0.0, {}
+            raise EvaluationException("Failed to deserialize JSON!")
 
         def flatten_json(y: Any) -> Dict[str, Any]:
             out = {}
@@ -101,7 +105,8 @@ class EvaluationService:
         prompt = f"Oczekiwana odpowiedź:\n{expected}\n\nOtrzymana odpowiedź:\n{actual}"
 
         try:
-            response_text = await judge_client.generate(prompt=prompt, system_prompt=default_system_prompt)
+            response = await judge_client.generate(prompt=prompt, system_prompt=default_system_prompt)
+            response_text = response[0]
             match = re.search(r"\[SCORE:\s*([0-1](?:\.\d+)?)\]", response_text)
             if match:
                 score = float(match.group(1))

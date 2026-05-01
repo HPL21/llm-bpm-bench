@@ -37,7 +37,10 @@ class BaseLLMClient(ABC):
         self.timeout = httpx.Timeout(300.0, connect=10.0)
 
     @abstractmethod
-    async def generate(self, prompt: str, system_prompt: str | None = None, images: list[dict] | None = None) -> str:
+    async def generate(
+        self, prompt: str, system_prompt: str | None = None, images: list[dict] | None = None
+    ) -> tuple[str, int, int]:
+        """Zwraca: (response_text, prompt_tokens, completion_tokens)"""
         pass
 
     async def _safe_post(self, url: str, **kwargs) -> httpx.Response:
@@ -113,7 +116,13 @@ class OpenAICompatibleClient(BaseLLMClient):
 
         try:
             data = response.json()
-            return data["choices"][0]["message"]["content"]
+            response_text = data["choices"][0]["message"]["content"]
+
+            usage = data.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+
+            return response_text, prompt_tokens, completion_tokens  # type: ignore
         except (KeyError, ValueError) as e:
             logger.error(f"Nieoczekiwana struktura odpowiedzi OpenAI dla {self.model_name}: {response.text}")
             raise LLMException(f"Błąd parsowania odpowiedzi: {str(e)}")
@@ -141,7 +150,12 @@ class OllamaClient(BaseLLMClient):
 
         try:
             data = response.json()
-            return data["response"]
+            response_text = data["response"]
+
+            prompt_tokens = data.get("prompt_eval_count", 0)
+            completion_tokens = data.get("eval_count", 0)
+
+            return response_text, prompt_tokens, completion_tokens  # type: ignore
         except (KeyError, ValueError) as e:
             logger.error(f"Nieoczekiwana struktura odpowiedzi Ollama dla {self.model_name}: {response.text}")
             raise LLMException(f"Błąd parsowania odpowiedzi: {str(e)}")
