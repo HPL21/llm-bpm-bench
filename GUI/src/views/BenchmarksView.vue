@@ -2,12 +2,13 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { BenchmarkService, type BenchmarkRun } from '../services/api';
-import { ActivityIcon, PlusIcon, ChevronRightIcon } from 'lucide-vue-next';
+import { ActivityIcon, PlusIcon, ChevronRightIcon, TrashIcon } from 'lucide-vue-next';
 import BenchmarkModal from '../components/benchmarks/BenchmarkModal.vue';
 
 const router = useRouter();
 const runs = ref<BenchmarkRun[]>([]);
 const showModal = ref(false);
+const selectedIds = ref<Set<string>>(new Set());
 
 const loadRuns = async () => {
   try {
@@ -33,6 +34,40 @@ const getStatusColor = (status: string) => {
     default: return 'bg-gray-100 text-gray-800';
   }
 };
+
+const toggleSelection = (id: string) => {
+  const newSet = new Set(selectedIds.value);
+  if (newSet.has(id)) {
+    newSet.delete(id);
+  } else {
+    newSet.add(id);
+  }
+  selectedIds.value = newSet;
+};
+
+const selectAll = () => {
+  if (selectedIds.value.size === runs.value.length) {
+    selectedIds.value = new Set();
+  } else {
+    selectedIds.value = new Set(runs.value.map(r => r.id));
+  }
+};
+
+const deleteSelected = async () => {
+  if (selectedIds.value.size === 0) return;
+  
+  if (!confirm(`Czy na pewno chcesz usunąć ${selectedIds.value.size} uruchomień benchmarków?`)) {
+    return;
+  }
+
+  try {
+    await BenchmarkService.deleteRuns(Array.from(selectedIds.value));
+    selectedIds.value = new Set();
+    await loadRuns();
+  } catch (error) {
+    console.error("Error deleting benchmark runs:", error);
+  }
+};
 </script>
 
 <template>
@@ -42,16 +77,35 @@ const getStatusColor = (status: string) => {
         <ActivityIcon class="w-6 h-6 mr-2 text-indigo-600" />
         Historia Ewaluacji
       </div>
-      <button @click="showModal = true" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center shadow-sm">
-        <PlusIcon class="w-4 h-4 mr-2" />
-        Nowy Benchmark
-      </button>
+      <div class="flex gap-2">
+        <button 
+          v-if="selectedIds.size > 0"
+          @click="deleteSelected"
+          class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center shadow-sm"
+        >
+          <TrashIcon class="w-4 h-4 mr-2" />
+          Usuń zaznaczone ({{ selectedIds.size }})
+        </button>
+        <button @click="showModal = true" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center shadow-sm">
+          <PlusIcon class="w-4 h-4 mr-2" />
+          Nowy Benchmark
+        </button>
+      </div>
     </div>
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 flex flex-col min-h-0 overflow-hidden">
       <div class="overflow-auto flex-1">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50 sticky top-0 z-10 shadow-sm">
             <tr>
+              <th class="pl-4 pr-2 py-3 text-left">
+                <input 
+                  type="checkbox" 
+                  :checked="selectedIds.size > 0 && selectedIds.size === runs.length"
+                  :indeterminate="selectedIds.size > 0 && selectedIds.size < runs.length"
+                  @change="selectAll"
+                  class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+              </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nazwa</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Liczba Zadań</th>
@@ -60,7 +114,20 @@ const getStatusColor = (status: string) => {
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="run in runs" :key="run.id" class="hover:bg-gray-50 cursor-pointer" @click="router.push(`/benchmarks/${run.id}`)">
+            <tr 
+              v-for="run in runs" 
+              :key="run.id" 
+              class="hover:bg-gray-50 cursor-pointer"
+              @click="router.push(`/benchmarks/${run.id}`)"
+            >
+              <td class="pl-4 pr-2 py-4" @click.stop>
+                <input 
+                  type="checkbox" 
+                  :checked="selectedIds.has(run.id)"
+                  @change="toggleSelection(run.id)"
+                  class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+              </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                 {{ run.name }}
               </td>
@@ -80,7 +147,7 @@ const getStatusColor = (status: string) => {
               </td>
             </tr>
             <tr v-if="runs.length === 0">
-              <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+              <td colspan="6" class="px-6 py-8 text-center text-gray-500">
                 Brak uruchomień benchmarków. Kliknij "Nowy Benchmark" aby rozpocząć.
               </td>
             </tr>

@@ -230,4 +230,9 @@ export const BenchmarkService = {
     const response = await api.get(`/benchmarks/runs/${runId}/summary`);
     return response.data;
   },
+
+  async deleteRuns(ids: string[]) {
+    const response = await api.post(`/benchmarks/runs/delete`, ids);
+    return response.data;
+  },
 };

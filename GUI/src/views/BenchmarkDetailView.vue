@@ -298,7 +298,11 @@ const diffResult = computed(() => {
         </div>
 
         <div class="p-5 overflow-y-auto space-y-6 flex-1">
-          <div class="p-5 overflow-y-auto space-y-6 flex-1">
+            <div v-if="selectedExecution.error_message" class="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+              <h4 class="text-sm font-semibold text-red-700 mb-2">Błąd:</h4>
+              <div class="text-sm text-red-600 font-mono whitespace-pre-wrap">{{ selectedExecution.error_message }}</div>
+            </div>
+
             <div>
               <h4 class="text-sm font-semibold text-gray-700 mb-2">Różnice:</h4>
               <div
@@ -313,7 +317,7 @@ const diffResult = computed(() => {
                 <span v-else class="text-gray-500 italic">Brak danych do porównania.</span>
               </div>
             </div>
-          </div>
+
           <div class="grid grid-cols-2 gap-4">
             <div>
               <h4 class="text-sm font-semibold text-gray-700 mb-2">Oczekiwana odpowiedź:</h4>

@@ -80,9 +80,11 @@ async def create_benchmark_run(
 @router.get("/runs", response_model=List[BenchmarkRunResponse])
 async def get_benchmark_runs(db: AsyncSession = Depends(get_db)):
     """
-    Zwraca listę wszystkich uruchomień benchmarków.
+    Zwraca listę wszystkich uruchomień benchmarków (pomija usunięte).
     """
-    stmt = select(BenchmarkRun).options(
+    stmt = select(BenchmarkRun).where(
+        BenchmarkRun.is_deleted.is_(False)
+    ).options(
         selectinload(BenchmarkRun.executions)
     ).order_by(BenchmarkRun.created_at.desc())
 
@@ -102,6 +104,26 @@ async def get_benchmark_runs(db: AsyncSession = Depends(get_db)):
         )
 
     return response
+
+
+@router.post("/runs/delete", status_code=status.HTTP_200_OK)
+async def delete_benchmark_runs(
+    run_ids: List[UUID],
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Soft delete - ustawia is_deleted na True dla podanych uruchomień benchmarków.
+    """
+    stmt = (
+        update(BenchmarkRun)
+        .where(BenchmarkRun.id.in_(run_ids))
+        .values(is_deleted=True)
+    )
+
+    await db.execute(stmt)
+    await db.commit()
+
+    return {"message": f"Usunięto {len(run_ids)} uruchomień benchmarków."}
 
 
 @router.get("/runs/{run_id}", response_model=BenchmarkRunDetailResponse)
