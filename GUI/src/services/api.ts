@@ -113,6 +113,8 @@ export interface TestSuite {
   description: string | null;
   system_prompt: string;
   verification_method: string;
+  qdrant_collection: string | null;
+  embedding_model_id: string | null;
   parameters?: Record<string, any> | null;
   created_at: string;
   updated_at: string | null;
@@ -235,4 +237,39 @@ export const BenchmarkService = {
     const response = await api.post(`/benchmarks/runs/delete`, ids);
     return response.data;
   },
+};
+
+export interface QdrantCollection {
+  name: string;
+}
+
+export interface QdrantIndexRequest {
+  collection_name: string;
+  file_ids: string[];
+}
+
+export const QdrantService = {
+  async listCollections() {
+    const response = await api.get<{ collections: string[] }>('/qdrant/collections');
+    return response.data;
+  },
+
+  async createCollection(collectionName: string) {
+    const response = await api.post('/qdrant/collections', { collection_name: collectionName });
+    return response.data;
+  },
+
+  async deleteCollection(collectionName: string) {
+    const response = await api.delete(`/qdrant/collections/${collectionName}`);
+    return response.data;
+  },
+
+  async indexCollection(qdrantCollection: string, modelId?: string, minioCatalog?: string) {
+    const response = await api.post('/qdrant/index-collection', {
+      collection_name: qdrantCollection,
+      model_id: modelId,
+      minio_catalog: minioCatalog
+    });
+    return response.data;
+  }
 };

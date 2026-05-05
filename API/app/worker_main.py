@@ -20,11 +20,19 @@ from app.core.llm_clients import LLMClientFactory, LLMException
 from app.core.utils import clean_llm_response
 from app.services.evaluation_service import EvaluationService, EvaluationException
 from app.services.storage_service import storage_service
+from app.services.qdrant_service import qdrant_service
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("BenchmarkWorker")
 
 MAX_IMAGE_SIZE = (1024, 1024)
+
+RAG_PROMPT_TEMPLATE = """Kontekst z bazy wiedzy:
+{context}
+
+Pytanie: {question}
+
+Odpowiedz na pytanie korzystając wyłącznie z podanego kontekstu. Jeśli odpowiedź nie znajduje się w kontekście, napisz "Brak odpowiedzi w dostępnym kontekście"."""  # noqa
 
 
 def get_file_content(file_asset: FileAsset) -> dict:
@@ -115,30 +123,54 @@ async def process_single_execution(execution_id: uuid.UUID):
             logger.info(f"Procesowanie [{execution_id}]: Model='{llm_model.name}', TestCase='{test_case.id}'")
             client = LLMClientFactory.get_client(llm_model)
 
-            combined_prompt = test_case.input_text or ""
-            images_list = []
+            if test_suite.qdrant_collection:
+                logger.info(f"Tryb RAG: wyszukiwanie w kolekcji '{test_suite.qdrant_collection}'")
+                relevant_chunks = await qdrant_service.search_relevant_chunks(
+                    collection_name=test_suite.qdrant_collection,
+                    query=test_case.input_text or "",
+                    model_id=str(test_suite.embedding_model_id) if test_suite.embedding_model_id else None,
+                    limit=5
+                )
 
-            if test_case.files:
-                file_contents_list = []
-                for file_asset in test_case.files:
-                    file_data = await asyncio.to_thread(get_file_content, file_asset)
-
-                    if file_data["type"] == "text" or file_data["type"] == "error":
-                        file_contents_list.append(
-                            f"--- Początek zawartości pliku: {file_asset.filename} ---\n"
-                            f"{file_data['content']}\n"
-                            f"--- Koniec zawartości pliku: {file_asset.filename} ---"
-                        )
-                    elif file_data["type"] == "image":
-                        images_list.append(file_data)
-
-                if file_contents_list:
-                    files_block = "\n\n".join(file_contents_list)
-                    if combined_prompt:
-                        combined_prompt = f"{combined_prompt}\n\n{files_block}"
+                context_parts = []
+                for chunk_data in relevant_chunks:
+                    text, page_num, filename = chunk_data
+                    if page_num and filename:
+                        context_parts.append(f"[Plik: {filename}, Strona: {page_num}]\n{text}")
                     else:
-                        combined_prompt = files_block
+                        context_parts.append(text)
+                context = "\n\n".join(context_parts) if context_parts else "Brak kontekstu."
+                combined_prompt = RAG_PROMPT_TEMPLATE.format(
+                    context=context,
+                    question=test_case.input_text or ""
+                )
+                images_list = None
+            else:
+                combined_prompt = test_case.input_text or ""
+                images_list = []
 
+                if test_case.files:
+                    file_contents_list = []
+                    for file_asset in test_case.files:
+                        file_data = await asyncio.to_thread(get_file_content, file_asset)
+
+                        if file_data["type"] == "text" or file_data["type"] == "error":
+                            file_contents_list.append(
+                                f"--- Początek zawartości pliku: {file_asset.filename} ---\n"
+                                f"{file_data['content']}\n"
+                                f"--- Koniec zawartości pliku: {file_asset.filename} ---"
+                            )
+                        elif file_data["type"] == "image":
+                            images_list.append(file_data)
+
+                    if file_contents_list:
+                        files_block = "\n\n".join(file_contents_list)
+                        if combined_prompt:
+                            combined_prompt = f"{combined_prompt}\n\n{files_block}"
+                        else:
+                            combined_prompt = files_block
+
+            logger.info(f"combined_prompt: {combined_prompt}")
             start_time = asyncio.get_event_loop().time()
 
             response_text, prompt_tokens, completion_tokens = await client.generate(

@@ -5,6 +5,7 @@ import TestCasesView from '../views/TestCasesView.vue';
 import ModelsView from '../views/ModelsView.vue';
 import BenchmarksView from '../views/BenchmarksView.vue';
 import BenchmarkDetailView from '../views/BenchmarkDetailView.vue';
+import QdrantView from '../views/QdrantView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -44,6 +45,11 @@ const router = createRouter({
       name: 'BenchmarkDetail',
       component: BenchmarkDetailView,
       props: true
+    },
+    {
+      path: '/qdrant',
+      name: 'Qdrant',
+      component: QdrantView
     }
   ]
 });

@@ -1,4 +1,24 @@
 services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: always
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:6333/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
   db:
     image: postgres:15-alpine
     restart: always
@@ -55,10 +75,14 @@ services:
       - "8000:8000"
     env_file:
       - ./API/.env
+    environment:
+      - QDRANT_URL=http://qdrant:6333
     depends_on:
       db:
         condition: service_healthy
       minio:
+        condition: service_started
+      qdrant:
         condition: service_started
     deploy:
       resources:
@@ -66,7 +90,6 @@ services:
           memory: 512M
         reservations:
           memory: 256M
-
 
   worker:
     build:
@@ -79,10 +102,14 @@ services:
       - /app/.venv
     env_file:
       - ./API/.env
+    environment:
+      - QDRANT_URL=http://qdrant:6333
     depends_on:
       db:
         condition: service_healthy
       minio:
+        condition: service_started
+      qdrant:
         condition: service_started
     deploy:
       resources:
@@ -94,3 +121,4 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  qdrant_data:

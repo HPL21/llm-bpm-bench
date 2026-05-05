@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DatabaseIcon, FolderOpenIcon, CpuIcon, ActivityIcon } from 'lucide-vue-next';
+import { DatabaseIcon, FolderOpenIcon, CpuIcon, ActivityIcon, SearchIcon } from 'lucide-vue-next';
 </script>
 
 <template>
@@ -24,6 +24,13 @@ import { DatabaseIcon, FolderOpenIcon, CpuIcon, ActivityIcon } from 'lucide-vue-
             inactive-class="text-gray-300 hover:bg-slate-800 hover:text-white">
             <DatabaseIcon class="w-4 h-4 mr-2" />
             Zbiory Testowe
+          </router-link>
+
+          <router-link to="/qdrant" class="px-4 py-2 rounded-md text-sm font-medium flex items-center transition-colors"
+            active-class="bg-slate-800 text-indigo-400"
+            inactive-class="text-gray-300 hover:bg-slate-800 hover:text-white">
+            <SearchIcon class="w-4 h-4 mr-2" />
+            Baza wektorowa
           </router-link>
 
           <router-link to="/models" class="px-4 py-2 rounded-md text-sm font-medium flex items-center transition-colors"

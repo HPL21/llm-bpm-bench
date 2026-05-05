@@ -34,7 +34,9 @@ class SuiteService:
             description=schema.description,
             system_prompt=schema.system_prompt,
             verification_method=schema.verification_method,
-            parameters=schema.parameters
+            parameters=schema.parameters,
+            qdrant_collection=schema.qdrant_collection,
+            embedding_model_id=schema.embedding_model_id
         )
         db.add(db_obj)
         await db.commit()
@@ -45,7 +47,7 @@ class SuiteService:
         self, db: AsyncSession, suite: TestSuite, schema: TestSuiteUpdate
     ) -> TestSuite:
         """Update an existing test suite."""
-        update_data = schema.model_dump(exclude_unset=True)
+        update_data = schema.model_dump()
         for field, value in update_data.items():
             setattr(suite, field, value)
 

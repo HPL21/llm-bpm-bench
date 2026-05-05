@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { XIcon } from 'lucide-vue-next';
-import type { TestSuiteCreate, TestSuite } from '../../services/api';
+import type { TestSuiteCreate, TestSuite, LLMModel } from '../../services/api';
+import { ModelService } from '../../services/api';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -17,10 +18,13 @@ const formData = ref<TestSuiteCreate>({
   name: '',
   description: '',
   system_prompt: '',
-  verification_method: 'EXACT_MATCH'
+  verification_method: 'EXACT_MATCH',
+  qdrant_collection: null,
+  embedding_model_id: null
 });
-
 const parametersString = ref('');
+const models = ref<LLMModel[]>([]);
+const inputRef = ref<HTMLInputElement | null>(null);
 
 const verificationMethods = [
   { value: 'EXACT_MATCH', label: 'Dokładne dopasowanie tekstu' },
@@ -29,15 +33,33 @@ const verificationMethods = [
   { value: 'LLM_EVAL', label: 'Ocena przy pomocy LLM jako sędziego' }
 ];
 
-const inputRef = ref<HTMLInputElement | null>(null);
+const loadModels = async () => {
+  try {
+    models.value = await ModelService.getAllModels();
+  } catch (error) {
+    console.error('Błąd pobierania modeli:', error);
+  }
+};
 
 watch(() => props.isOpen, async (isOpen) => {
   if (isOpen) {
     if (props.suiteToEdit) {
-      formData.value = { ...props.suiteToEdit, description: props.suiteToEdit.description || '' };
+      formData.value = {
+        ...props.suiteToEdit,
+        description: props.suiteToEdit.description || '',
+        qdrant_collection: props.suiteToEdit.qdrant_collection,
+        embedding_model_id: props.suiteToEdit.embedding_model_id
+      };
       parametersString.value = props.suiteToEdit.parameters ? JSON.stringify(props.suiteToEdit.parameters, null, 2) : '';
     } else {
-      formData.value = { name: '', description: '', system_prompt: '', verification_method: 'EXACT_MATCH' };
+      formData.value = {
+        name: '',
+        description: '',
+        system_prompt: '',
+        verification_method: 'EXACT_MATCH',
+        qdrant_collection: null,
+        embedding_model_id: null
+      };
       parametersString.value = '';
     }
     await nextTick();
@@ -68,12 +90,12 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown);
+  loadModels();
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
 });
-
 </script>
 
 <template>
@@ -104,6 +126,23 @@ onUnmounted(() => {
           <select v-model="formData.verification_method" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
             <option v-for="method in verificationMethods" :key="method.value" :value="method.value">
               {{ method.label }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Qdrant Collection (opcjonalnie)</label>
+          <p class="text-xs text-gray-500 mb-2">Nazwa kolekcji Qdrant dla trybu RAG. Jeśli wypełnione, system będzie wyszukiwał relevantne fragmenty zamiast wysyłać pliki.</p>
+          <input v-model="formData.qdrant_collection" type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="np. moja-kolekcja-rag" />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Model embeddingowy (opcjonalnie)</label>
+          <p class="text-xs text-gray-500 mb-2">Model używany do generowania embeddingów dla trybu RAG.</p>
+          <select v-model="formData.embedding_model_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+            <option value="">-- Wybierz model --</option>
+            <option v-for="model in models" :key="model.id" :value="model.id">
+              {{ model.name }} ({{ model.provider }})
             </option>
           </select>
         </div>

@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = ""
     POSTGRES_DB: str = ""
 
+    QDRANT_URL: str = "http://localhost:6333"
+    CHUNK_SIZE: int = 512
+    CHUNK_OVERLAP: int = 50
+
     model_config = SettingsConfigDict(
         env_file=".env", env_ignore_empty=True, extra="ignore"
     )

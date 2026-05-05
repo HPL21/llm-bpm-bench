@@ -22,6 +22,8 @@ class TestSuiteBase(BaseModel):
         description="Method like EXACT_MATCH, JSON_COMPARE, OCR_MATCH"
     )
     parameters: dict[str, Any] | None = Field(None, description="Optional parameter overrides for this suite")
+    qdrant_collection: str | None = Field(None, description="Qdrant collection name for RAG mode")
+    embedding_model_id: UUID | None = Field(None, description="ID of the embedding model for RAG mode")
 
 
 class TestSuiteCreate(TestSuiteBase):
@@ -36,6 +38,8 @@ class TestSuiteUpdate(BaseModel):
     system_prompt: str | None = None
     verification_method: str | None = None
     parameters: dict[str, Any] | None = None
+    qdrant_collection: str | None = None
+    embedding_model_id: UUID | None = None
 
 
 class TestSuiteRead(TestSuiteBase):
@@ -43,4 +47,5 @@ class TestSuiteRead(TestSuiteBase):
     id: UUID
     created_at: datetime
     updated_at: datetime | None = None
+    embedding_model_id: UUID | None = None
     model_config = ConfigDict(from_attributes=True)

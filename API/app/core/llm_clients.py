@@ -43,6 +43,11 @@ class BaseLLMClient(ABC):
         """Zwraca: (response_text, prompt_tokens, completion_tokens)"""
         pass
 
+    @abstractmethod
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings for texts. Returns list of embedding vectors."""
+        pass
+
     async def _safe_post(self, url: str, **kwargs) -> httpx.Response:
         """Wewnętrzna metoda do bezpiecznego wysyłania zapytań z inteligentną obsługą błędów."""
         try:
@@ -127,6 +132,34 @@ class OpenAICompatibleClient(BaseLLMClient):
             logger.error(f"Nieoczekiwana struktura odpowiedzi OpenAI dla {self.model_name}: {response.text}")
             raise LLMException(f"Błąd parsowania odpowiedzi: {str(e)}")
 
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings using OpenAI-compatible API."""
+        payload = {
+            "model": self.model_name,
+            "input": texts
+        }
+
+        headers = {"Content-Type": "application/json"}
+        if self.model_config.api_key:
+            headers["Authorization"] = f"Bearer {self.model_config.api_key}"
+
+        response = await self._safe_post(
+            f"{self.base_url}/v1/embeddings",
+            json=payload,
+            headers=headers
+        )
+
+        try:
+            data = response.json()
+            if "data" in data:
+                embeddings = [item["embedding"] for item in sorted(data["data"], key=lambda x: x.get("index", 0))]
+                return embeddings
+            else:
+                raise LLMException(f"Unexpected embedding response format: {data}")
+        except (KeyError, ValueError) as e:
+            logger.error(f"Nieoczekiwana struktura odpowiedzi embeddings dla {self.model_name}: {response.text}")
+            raise LLMException(f"Błąd parsowania odpowiedzi embeddings: {str(e)}")
+
 
 class OllamaClient(BaseLLMClient):
     async def generate(self, prompt: str, system_prompt: str | None = None, images: list[dict] | None = None) -> str:
@@ -159,6 +192,26 @@ class OllamaClient(BaseLLMClient):
         except (KeyError, ValueError) as e:
             logger.error(f"Nieoczekiwana struktura odpowiedzi Ollama dla {self.model_name}: {response.text}")
             raise LLMException(f"Błąd parsowania odpowiedzi: {str(e)}")
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings using Ollama API."""
+        embeddings = []
+        for text in texts:
+            payload = {
+                "model": self.model_name,
+                "prompt": text
+            }
+            response = await self._safe_post(
+                f"{self.base_url}/api/embeddings",
+                json=payload
+            )
+            try:
+                data = response.json()
+                embeddings.append(data["embedding"])
+            except (KeyError, ValueError) as e:
+                logger.error(f"Nieoczekiwana struktura odpowiedzi embeddings Ollama: {response.text}")
+                raise LLMException(f"Błąd parsowania odpowiedzi embeddings: {str(e)}")
+        return embeddings
 
 
 class LLMClientFactory:
