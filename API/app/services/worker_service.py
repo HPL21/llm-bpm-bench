@@ -9,6 +9,7 @@ from app.models.benchmark_run import BenchmarkRun, RunStatus  # noqa
 from app.models.llm_model import LLMModel
 from app.models.test_case import TestCase
 from app.models.test_suite import TestSuite
+from app.core.config import settings
 from app.core.llm_clients import LLMClientFactory, LLMException
 from app.core.utils import clean_llm_response
 from app.services.evaluation_service import EvaluationService, EvaluationException
@@ -53,7 +54,8 @@ class WorkerService:
         system_prompt: str,
         images: list,
         verification_method: str,
-        expected_text: str
+        expected_text: str,
+        judge_client=None
     ) -> tuple:
         """
         Execute LLM and evaluate response.
@@ -75,7 +77,8 @@ class WorkerService:
         score, eval_details = await EvaluationService.evaluate(
             verification_method=verification_method,
             expected=expected_text,
-            actual=cleaned_response_text
+            actual=cleaned_response_text,
+            judge_client=judge_client
         )
 
         return response_text, cleaned_response_text, score, eval_details, latency_ms, prompt_tokens, completion_tokens
@@ -130,13 +133,30 @@ class WorkerService:
 
                 expected_text = test_case.expected_output or ""
 
+                judge_client = None
+                if test_suite.verification_method == "LLM_EVAL":
+                    judge_model_name = settings.JUDGE_MODEL_NAME
+                    
+                    if not judge_model_name:
+                        raise Exception("Brak zmiennej JUDGE_MODEL_NAME w pliku .env (lub ma pustą wartość)!")
+                    
+                    judge_stmt = select(LLMModel).where(LLMModel.name == judge_model_name)
+                    judge_result = await db.execute(judge_stmt)
+                    judge_model = judge_result.scalar_one_or_none()
+                    
+                    if not judge_model:
+                        raise Exception(f"Nie znaleziono modelu sędziego '{judge_model_name}' w bazie danych!")
+                        
+                    judge_client = LLMClientFactory.get_client(judge_model)
+
                 response_text, cleaned_response_text, score, eval_details, latency_ms, prompt_tokens, completion_tokens = await self._execute_llm_and_process(
                     client=client,
                     prompt=combined_prompt,
                     system_prompt=test_suite.system_prompt,
                     images=images_list,
                     verification_method=test_suite.verification_method,
-                    expected_text=expected_text
+                    expected_text=expected_text,
+                    judge_client=judge_client
                 )
 
                 await self._save_results(
