@@ -1,20 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, func
-from sqlalchemy.orm import selectinload
 from typing import List, Any
 from uuid import UUID
 from app.core.database import get_db
-from app.models.benchmark_run import BenchmarkRun, RunStatus
-from app.models.benchmark_execution import BenchmarkExecution, ExecutionStatus
-from app.models.llm_model import LLMModel
-from app.models.test_case import TestCase
-from app.models.test_suite import TestSuite
+from app.models.benchmark_execution import ExecutionStatus
 from app.schemas.benchmark import (
     BenchmarkRunCreate,
     BenchmarkRunResponse,
     BenchmarkRunDetailResponse
 )
+from app.services.benchmark_service import benchmark_service
 
 router = APIRouter()
 
@@ -34,45 +29,16 @@ async def create_benchmark_run(
     if not payload.suite_ids:
         raise HTTPException(status_code=400, detail="Nie wybrano żadnego zbioru testowego.")
 
-    stmt = select(TestCase.id).where(TestCase.suite_id.in_(payload.suite_ids))
-    result = await db.execute(stmt)
-    test_case_ids = result.scalars().all()
-
-    if not test_case_ids:
-        raise HTTPException(
-            status_code=400,
-            detail="Wybrane zbiory testowe są puste (brak przypadków testowych)."
-        )
-
-    default_name = f"Benchmark: {len(payload.model_ids)} modeli, {len(payload.suite_ids)} zbiorów"
-    new_run = BenchmarkRun(
-        name=payload.name or default_name,
-        status=RunStatus.PENDING
-    )
-
-    db.add(new_run)
-    await db.flush()
-
-    executions_to_insert = []
-    for model_id in payload.model_ids:
-        for tc_id in test_case_ids:
-            execution = BenchmarkExecution(
-                run_id=new_run.id,
-                test_case_id=tc_id,
-                llm_model_id=model_id,
-                status=ExecutionStatus.PENDING
-            )
-            executions_to_insert.append(execution)
-
-    db.add_all(executions_to_insert)
-
-    await db.commit()
+    try:
+        new_run = await benchmark_service.create_run(db, payload)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     return BenchmarkRunResponse(
         id=new_run.id,
         name=new_run.name,
         status=new_run.status,
-        total_executions=len(executions_to_insert),
+        total_executions=len(new_run.executions),
         created_at=new_run.created_at
     )
 
@@ -82,14 +48,7 @@ async def get_benchmark_runs(db: AsyncSession = Depends(get_db)):
     """
     Zwraca listę wszystkich uruchomień benchmarków (pomija usunięte).
     """
-    stmt = select(BenchmarkRun).where(
-        BenchmarkRun.is_deleted.is_(False)
-    ).options(
-        selectinload(BenchmarkRun.executions)
-    ).order_by(BenchmarkRun.created_at.desc())
-
-    result = await db.execute(stmt)
-    runs = result.scalars().all()
+    runs = await benchmark_service.get_all_runs(db)
 
     response = []
     for run in runs:
@@ -114,16 +73,8 @@ async def delete_benchmark_runs(
     """
     Soft delete - ustawia is_deleted na True dla podanych uruchomień benchmarków.
     """
-    stmt = (
-        update(BenchmarkRun)
-        .where(BenchmarkRun.id.in_(run_ids))
-        .values(is_deleted=True)
-    )
-
-    await db.execute(stmt)
-    await db.commit()
-
-    return {"message": f"Usunięto {len(run_ids)} uruchomień benchmarków."}
+    count = await benchmark_service.delete_runs(db, run_ids)
+    return {"message": f"Usunięto {count} uruchomień benchmarków."}
 
 
 @router.get("/runs/{run_id}", response_model=BenchmarkRunDetailResponse)
@@ -132,28 +83,15 @@ async def get_benchmark_run_details(run_id: UUID, db: AsyncSession = Depends(get
     Zwraca szczegóły uruchomienia, wylicza postęp (statystyki z zadań podrzędnych)
     oraz zwraca listę wszystkich egzekucji.
     """
-    stmt = select(BenchmarkRun).where(BenchmarkRun.id == run_id).options(
-        selectinload(BenchmarkRun.executions)
-        .joinedload(BenchmarkExecution.llm_model),
-        selectinload(BenchmarkRun.executions)
-        .joinedload(BenchmarkExecution.test_case)
-    )
-    result = await db.execute(stmt)
-    run = result.scalar_one_or_none()
+    run = await benchmark_service.get_run_details(db, run_id)
 
     if not run:
         raise HTTPException(status_code=404, detail="Nie znaleziono takiego benchmarku.")
-
-    run.executions.sort(key=lambda e: (e.created_at, e.id))
 
     total = len(run.executions)
     completed = sum(1 for e in run.executions if e.status == ExecutionStatus.COMPLETED)
     failed = sum(1 for e in run.executions if e.status == ExecutionStatus.FAILED)
     pending = sum(1 for e in run.executions if e.status in [ExecutionStatus.PENDING, ExecutionStatus.PROCESSING])
-
-    if total > 0 and (completed + failed) == total and run.status != RunStatus.COMPLETED:
-        run.status = RunStatus.COMPLETED
-        await db.commit()
 
     return BenchmarkRunDetailResponse(
         id=run.id,
@@ -174,28 +112,10 @@ async def cancel_benchmark_run(run_id: UUID, db: AsyncSession = Depends(get_db))
     Anuluje uruchomienie. Wszystkie zadania, które mają status PENDING
     zostaną zmienione na CANCELLED. Workery po prostu ich nie podejmą.
     """
-
-    stmt = select(BenchmarkRun).where(BenchmarkRun.id == run_id)
-    result = await db.execute(stmt)
-    run = result.scalar_one_or_none()
+    run = await benchmark_service.cancel_run(db, run_id)
 
     if not run:
-        raise HTTPException(status_code=404, detail="Nie znaleziono takiego benchmarku.")
-
-    if run.status in [RunStatus.COMPLETED, RunStatus.CANCELLED]:
-        raise HTTPException(status_code=400, detail="Tego benchmarku nie można już anulować.")
-    run.status = RunStatus.CANCELLED
-    cancel_exec_stmt = (
-        update(BenchmarkExecution)
-        .where(
-            BenchmarkExecution.run_id == run_id,
-            BenchmarkExecution.status == ExecutionStatus.PENDING
-        )
-        .values(status=ExecutionStatus.CANCELLED)
-    )
-
-    await db.execute(cancel_exec_stmt)
-    await db.commit()
+        raise HTTPException(status_code=404, detail="Nie znaleziono takiego benchmarku lub nie można go anulować.")
 
     return {"message": "Benchmark został pomyślnie anulowany."}
 
@@ -206,39 +126,5 @@ async def get_benchmark_summary(run_id: UUID, db: AsyncSession = Depends(get_db)
     Zwraca zagregowane podsumowanie dla danego uruchomienia benchmarku:
     średnią poprawność, czas i zużycie tokenów pogrupowane po modelu i zbiorze testowym.
     """
-
-    stmt = (
-        select(
-            LLMModel.name.label("model_name"),
-            TestSuite.name.label("suite_name"),
-            func.avg(BenchmarkExecution.score).label("avg_score"),
-            (func.avg(BenchmarkExecution.latency_ms) / 1000.0).label("avg_time"),
-            func.avg(
-                func.coalesce(BenchmarkExecution.prompt_tokens, 0) +
-                func.coalesce(BenchmarkExecution.completion_tokens, 0)
-            ).label("avg_tokens")
-        )
-        .join(LLMModel, BenchmarkExecution.llm_model_id == LLMModel.id)
-        .join(TestCase, BenchmarkExecution.test_case_id == TestCase.id)
-        .join(TestSuite, TestCase.suite_id == TestSuite.id)
-        .where(BenchmarkExecution.run_id == run_id)
-        .where(BenchmarkExecution.status.in_([ExecutionStatus.COMPLETED, ExecutionStatus.FAILED]))
-        .group_by(LLMModel.name, TestSuite.name)
-    )
-
-    result = await db.execute(stmt)
-    summary = result.all()
-
-    if not summary:
-        return []
-
-    return [
-        {
-            "model": row.model_name,
-            "test_suite": row.suite_name,
-            "avg_correctness": round((row.avg_score or 0) * 100, 2),
-            "avg_time": round(row.avg_time or 0, 2),
-            "avg_tokens": round(row.avg_tokens or 0, 0)
-        }
-        for row in summary
-    ]
+    summary = await benchmark_service.get_run_summary(db, run_id)
+    return summary

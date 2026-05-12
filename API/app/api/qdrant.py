@@ -1,9 +1,8 @@
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
-from app.models.file_asset import FileAsset
 from app.services.qdrant_service import qdrant_service
+from app.services.file_service import file_service
 
 router = APIRouter()
 
@@ -66,14 +65,11 @@ async def index_collection(request: IndexCollectionRequest):
                 qdrant_service.create_collection(request.collection_name)
 
             if request.minio_catalog:
-                stmt = select(FileAsset).where(
-                    FileAsset.collection_name == request.minio_catalog,
-                    FileAsset.filename != '.keep'
+                files = await file_service.get_files_by_collection(
+                    db, request.minio_catalog, exclude_keep=True
                 )
             else:
-                stmt = select(FileAsset)
-            result = await db.execute(stmt)
-            files = result.scalars().all()
+                files = await file_service.get_all_files(db)
 
             if not files:
                 return {

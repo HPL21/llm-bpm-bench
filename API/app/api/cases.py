@@ -3,10 +3,8 @@ import io
 from uuid import UUID
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.models.file_asset import FileAsset
 from app.schemas.test_case import TestCaseCreate, TestCaseRead, TestCaseUpdate
 from app.services.case_service import case_service
 
@@ -118,15 +116,9 @@ async def import_cases_from_csv(
                 status_code=400,
                 detail="Plik CSV odwołuje się do plików, ale nie wybrano kolekcji."
             )
-        result = await db.execute(
-            select(FileAsset)
-            .where(FileAsset.collection_name == collection_name)
-            .where(FileAsset.filename.in_(required_filenames))
+        found_files, missing_files = await case_service.get_files_by_filenames(
+            db, collection_name, required_filenames
         )
-        found_files = result.scalars().all()
-        found_filenames = {f.filename for f in found_files}
-
-        missing_files = required_filenames - found_filenames
 
         if missing_files:
             raise HTTPException(

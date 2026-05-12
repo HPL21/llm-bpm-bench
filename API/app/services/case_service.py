@@ -76,5 +76,22 @@ class CaseService:
         await db.refresh(case)
         return case
 
+    async def get_files_by_filenames(
+        self, db: AsyncSession, collection_name: str, filenames: set
+    ) -> tuple[list, set]:
+        """
+        Fetch files from a collection matching the given filenames.
+        Returns a tuple of (found_files, missing_filenames).
+        """
+        result = await db.execute(
+            select(FileAsset)
+            .where(FileAsset.collection_name == collection_name)
+            .where(FileAsset.filename.in_(filenames))
+        )
+        found_files = result.scalars().all()
+        found_filenames = {f.filename for f in found_files}
+        missing_files = filenames - found_filenames
+        return list(found_files), missing_files
+
 
 case_service = CaseService()
