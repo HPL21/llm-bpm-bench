@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Any
 from uuid import UUID
+from fastapi.responses import StreamingResponse
 from app.core.database import get_db
 from app.models.benchmark_execution import ExecutionStatus
 from app.schemas.benchmark import (
@@ -128,3 +129,21 @@ async def get_benchmark_summary(run_id: UUID, db: AsyncSession = Depends(get_db)
     """
     summary = await benchmark_service.get_run_summary(db, run_id)
     return summary
+
+
+@router.post("/runs/export-excel")
+async def export_benchmark_runs_to_excel(
+    run_ids: List[UUID],
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Eksportuje wybrane uruchomienia benchmarków do pliku Excel.
+    """
+    import io
+    excel_data = await benchmark_service.export_to_excel(db, run_ids)
+    
+    return StreamingResponse(
+        io.BytesIO(excel_data),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=benchmark_results.xlsx"}
+    )

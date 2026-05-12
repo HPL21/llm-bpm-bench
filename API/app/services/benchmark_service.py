@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import io
 from uuid import UUID
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple
 
 from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
@@ -13,6 +14,13 @@ from app.models.llm_model import LLMModel
 from app.models.test_case import TestCase
 from app.models.test_suite import TestSuite
 from app.schemas.benchmark import BenchmarkRunCreate
+
+try:
+    from openpyxl import Workbook
+    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import Font, Border, Side
+except ImportError:  # pragma: no cover
+    Workbook = None  # type: ignore
 
 
 class BenchmarkService:
@@ -187,6 +195,79 @@ class BenchmarkService:
             }
             for row in summary
         ]
+
+    async def export_to_excel(self, db: AsyncSession, run_ids: List[UUID]) -> bytes:
+        """
+        Export multiple benchmark runs to an Excel file.
+        Aggregates data across runs by model and test suite.
+        """
+        if Workbook is None:  # pragma: no cover
+            raise RuntimeError("openpyxl is not installed. Please install it to use Excel export.")
+
+        aggregated_data: Dict[Tuple[str, str], List[Tuple[float, float, float]]] = {}
+
+        for run_id in run_ids:
+            summary = await self.get_run_summary(db, run_id)
+            for item in summary:
+                key = (item["model"], item["test_suite"])
+                values = (
+                    item["avg_correctness"],
+                    item["avg_time"],
+                    item["avg_tokens"]
+                )
+                if key not in aggregated_data:
+                    aggregated_data[key] = []
+                aggregated_data[key].append(values)
+
+        rows = []
+        for (model, suite), values_list in aggregated_data.items():
+            avg_correctness = sum(v[0] for v in values_list) / len(values_list)
+            avg_time = sum(v[1] for v in values_list) / len(values_list)
+            avg_tokens = sum(v[2] for v in values_list) / len(values_list)
+            rows.append([
+                model,
+                suite,
+                round(avg_correctness, 2),
+                round(avg_time, 2),
+                round(avg_tokens, 0)
+            ])
+
+        rows.sort(key=lambda x: (x[0], x[1]))
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Benchmark Results"  # type: ignore
+
+        headers = ["Model", "Zbiór testowy", "Średnia poprawność", "Średni czas procesowania", "Średnie zużycie tokenów"]
+        ws.append(headers)  # type: ignore
+
+        for row in rows:
+            ws.append(row)  # type: ignore
+
+        header_font = Font(bold=True)
+        for cell in ws[1]:  # type: ignore
+            cell.font = header_font
+
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+
+        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):  # type: ignore
+            for cell in row:
+                cell.border = thin_border
+
+        for idx, column_cells in enumerate(ws.columns, 1):  # type: ignore
+            length = max(len(str(cell.value)) for cell in column_cells)
+            adjusted_width = min(length + 2, 50)
+            ws.column_dimensions[get_column_letter(idx)].width = adjusted_width  # type: ignore
+
+        excel_bytes = io.BytesIO()
+        wb.save(excel_bytes)
+        excel_bytes.seek(0)
+        return excel_bytes.read()
 
 
 benchmark_service = BenchmarkService()

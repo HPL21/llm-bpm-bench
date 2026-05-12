@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { BenchmarkService, type BenchmarkRun } from '../services/api';
-import { ActivityIcon, PlusIcon, ChevronRightIcon, TrashIcon } from 'lucide-vue-next';
+import { ActivityIcon, PlusIcon, ChevronRightIcon, TrashIcon, DownloadIcon } from 'lucide-vue-next';
 import BenchmarkModal from '../components/benchmarks/BenchmarkModal.vue';
 
 const router = useRouter();
@@ -59,7 +59,7 @@ const deleteSelected = async () => {
   if (!confirm(`Czy na pewno chcesz usunąć ${selectedIds.value.size} uruchomień benchmarków?`)) {
     return;
   }
-
+  
   try {
     await BenchmarkService.deleteRuns(Array.from(selectedIds.value));
     selectedIds.value = new Set();
@@ -68,30 +68,57 @@ const deleteSelected = async () => {
     console.error("Error deleting benchmark runs:", error);
   }
 };
+
+const exportToExcel = async () => {
+  if (selectedIds.value.size === 0) return;
+  
+  try {
+    const blob = await BenchmarkService.exportToExcel(Array.from(selectedIds.value));
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'benchmark_results.xlsx');
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Error exporting to Excel:", error);
+    alert("Wystąpił błąd podczas eksportowania do Excel");
+  }
+};
 </script>
 
 <template>
   <div class="h-full flex flex-col p-6 bg-gray-50">
-    <div class="flex justify-between items-center mb-6">
-      <div class="flex items-center text-xl font-semibold text-gray-800">
-        <ActivityIcon class="w-6 h-6 mr-2 text-indigo-600" />
-        Historia Ewaluacji
-      </div>
-      <div class="flex gap-2">
-        <button 
-          v-if="selectedIds.size > 0"
-          @click="deleteSelected"
-          class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center shadow-sm"
-        >
-          <TrashIcon class="w-4 h-4 mr-2" />
-          Usuń zaznaczone ({{ selectedIds.size }})
-        </button>
-        <button @click="showModal = true" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center shadow-sm">
-          <PlusIcon class="w-4 h-4 mr-2" />
-          Nowy Benchmark
-        </button>
-      </div>
-    </div>
+<div class="flex justify-between items-center mb-6">
+  <div class="flex items-center text-xl font-semibold text-gray-800">
+    <ActivityIcon class="w-6 h-6 mr-2 text-indigo-600" />
+    Historia Ewaluacji
+  </div>
+  <div class="flex gap-2">
+    <button 
+      v-if="selectedIds.size > 0"
+      @click="deleteSelected"
+      class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center shadow-sm"
+    >
+      <TrashIcon class="w-4 h-4 mr-2" />
+      Usuń zaznaczone ({{ selectedIds.size }})
+    </button>
+    <button 
+      v-if="selectedIds.size > 0"
+      @click="exportToExcel"
+      class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center shadow-sm"
+    >
+      <DownloadIcon class="w-4 h-4 mr-2" />
+      Eksportuj do Excel ({{ selectedIds.size }})
+    </button>
+    <button @click="showModal = true" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center shadow-sm">
+      <PlusIcon class="w-4 h-4 mr-2" />
+      Nowy Benchmark
+    </button>
+  </div>
+</div>
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 flex flex-col min-h-0 overflow-hidden">
       <div class="overflow-auto flex-1">
         <table class="min-w-full divide-y divide-gray-200">

@@ -227,7 +227,7 @@ export const BenchmarkService = {
     const response = await api.post(`/benchmarks/runs/${id}/cancel`);
     return response.data;
   },
-
+  
   async getRunSummary(runId: string) {
     const response = await api.get(`/benchmarks/runs/${runId}/summary`);
     return response.data;
@@ -237,6 +237,13 @@ export const BenchmarkService = {
     const response = await api.post(`/benchmarks/runs/delete`, ids);
     return response.data;
   },
+
+  async exportToExcel(runIds: string[]) {
+    const response = await api.post(`/benchmarks/runs/export-excel`, runIds, {
+      responseType: 'blob'
+    });
+    return response.data;
+  }
 };
 
 export interface QdrantCollection {
