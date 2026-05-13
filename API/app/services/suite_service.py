@@ -36,7 +36,8 @@ class SuiteService:
             verification_method=schema.verification_method,
             parameters=schema.parameters,
             qdrant_collection=schema.qdrant_collection,
-            embedding_model_id=schema.embedding_model_id
+            embedding_model_id=schema.embedding_model_id,
+            eval_prompt=schema.eval_prompt
         )
         db.add(db_obj)
         await db.commit()

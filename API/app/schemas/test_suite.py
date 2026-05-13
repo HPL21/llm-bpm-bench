@@ -24,6 +24,7 @@ class TestSuiteBase(BaseModel):
     parameters: dict[str, Any] | None = Field(None, description="Optional parameter overrides for this suite")
     qdrant_collection: str | None = Field(None, description="Qdrant collection name for RAG mode")
     embedding_model_id: UUID | None = Field(None, description="ID of the embedding model for RAG mode")
+    eval_prompt: str | None = Field(None, description="Optional prompt for LLM evaluation (judge)")
 
 
 class TestSuiteCreate(TestSuiteBase):
@@ -40,6 +41,7 @@ class TestSuiteUpdate(BaseModel):
     parameters: dict[str, Any] | None = None
     qdrant_collection: str | None = None
     embedding_model_id: UUID | None = None
+    eval_prompt: str | None = None
 
 
 class TestSuiteRead(TestSuiteBase):

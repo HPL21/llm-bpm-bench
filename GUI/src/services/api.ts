@@ -21,6 +21,10 @@ export interface TestSuite {
   description: string | null;
   system_prompt: string;
   verification_method: string;
+  qdrant_collection: string | null;
+  embedding_model_id: string | null;
+  parameters?: Record<string, any> | null;
+  eval_prompt?: string | null;
   created_at: string;
   updated_at: string | null;
 }
@@ -106,19 +110,6 @@ export const CaseService = {
     await api.delete(`/cases/${caseId}`);
   }
 };
-
-export interface TestSuite {
-  id: string;
-  name: string;
-  description: string | null;
-  system_prompt: string;
-  verification_method: string;
-  qdrant_collection: string | null;
-  embedding_model_id: string | null;
-  parameters?: Record<string, any> | null;
-  created_at: string;
-  updated_at: string | null;
-}
 
 
 export interface LLMModel {

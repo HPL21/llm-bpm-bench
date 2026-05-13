@@ -10,7 +10,7 @@ from app.models.llm_model import LLMModel
 from app.models.test_case import TestCase
 from app.models.test_suite import TestSuite
 from app.core.config import settings
-from app.core.llm_clients import LLMClientFactory, LLMException
+from app.core.llm_clients import BaseLLMClient, LLMClientFactory, LLMException
 from app.core.utils import clean_llm_response
 from app.services.evaluation_service import EvaluationService, EvaluationException
 from app.services.prompt_service import PromptService
@@ -49,17 +49,18 @@ class WorkerService:
 
     async def _execute_llm_and_process(
         self,
-        client,
+        client: BaseLLMClient,
         prompt: str,
         system_prompt: str,
         images: list,
         verification_method: str,
         expected_text: str,
-        judge_client=None
+        judge_client: BaseLLMClient | None = None,
+        eval_prompt: str | None = None
     ) -> tuple:
         """
         Execute LLM and evaluate response.
-        Returns (response_text, cleaned_response_text, score, eval_details, latency_ms, prompt_tokens, completion_tokens)
+        Returns (cleaned_response_text, score, eval_details, latency_ms, prompt_tokens, completion_tokens)
         """
         start_time = asyncio.get_event_loop().time()
 
@@ -78,10 +79,11 @@ class WorkerService:
             verification_method=verification_method,
             expected=expected_text,
             actual=cleaned_response_text,
-            judge_client=judge_client
+            judge_client=judge_client,
+            system_prompt=eval_prompt
         )
 
-        return response_text, cleaned_response_text, score, eval_details, latency_ms, prompt_tokens, completion_tokens
+        return cleaned_response_text, score, eval_details, latency_ms, prompt_tokens, completion_tokens
 
     async def _save_results(
         self,
@@ -114,7 +116,6 @@ class WorkerService:
         Pobiera dane wykonania, wywołuje LLM i ewaluację, a następnie zapisuje wyniki.
         """
         execution = None
-        response_text = None
         cleaned_response_text = None
         latency_ms = None
         prompt_tokens = None
@@ -136,28 +137,29 @@ class WorkerService:
                 judge_client = None
                 if test_suite.verification_method == "LLM_EVAL":
                     judge_model_name = settings.JUDGE_MODEL_NAME
-                    
+
                     if not judge_model_name:
                         raise Exception("Brak zmiennej JUDGE_MODEL_NAME w pliku .env (lub ma pustą wartość)!")
-                    
+
                     judge_stmt = select(LLMModel).where(LLMModel.name == judge_model_name)
                     judge_result = await db.execute(judge_stmt)
                     judge_model = judge_result.scalar_one_or_none()
-                    
+
                     if not judge_model:
                         raise Exception(f"Nie znaleziono modelu sędziego '{judge_model_name}' w bazie danych!")
-                        
+
                     judge_client = LLMClientFactory.get_client(judge_model)
 
-                response_text, cleaned_response_text, score, eval_details, latency_ms, prompt_tokens, completion_tokens = await self._execute_llm_and_process(
-                    client=client,
-                    prompt=combined_prompt,
-                    system_prompt=test_suite.system_prompt,
-                    images=images_list,
-                    verification_method=test_suite.verification_method,
-                    expected_text=expected_text,
-                    judge_client=judge_client
-                )
+                cleaned_response_text, score, eval_details, latency_ms, prompt_tokens, completion_tokens = await self._execute_llm_and_process(  # noqa
+                     client=client,
+                     prompt=combined_prompt,
+                     system_prompt=test_suite.system_prompt,
+                     images=images_list,
+                     verification_method=test_suite.verification_method,
+                     expected_text=expected_text,
+                     judge_client=judge_client,
+                     eval_prompt=test_suite.eval_prompt
+                 )
 
                 await self._save_results(
                     execution=execution,

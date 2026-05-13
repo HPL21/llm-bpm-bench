@@ -15,13 +15,14 @@ const emit = defineEmits<{
 }>();
 
 const formData = ref<TestSuiteCreate>({
-  name: '',
-  description: '',
-  system_prompt: '',
-  verification_method: 'EXACT_MATCH',
-  qdrant_collection: null,
-  embedding_model_id: null
-});
+   name: '',
+   description: '',
+   system_prompt: '',
+   verification_method: 'EXACT_MATCH',
+   qdrant_collection: null,
+   embedding_model_id: null,
+   eval_prompt: ''
+ });
 const parametersString = ref('');
 const models = ref<LLMModel[]>([]);
 const inputRef = ref<HTMLInputElement | null>(null);
@@ -42,30 +43,32 @@ const loadModels = async () => {
 };
 
 watch(() => props.isOpen, async (isOpen) => {
-  if (isOpen) {
-    if (props.suiteToEdit) {
-      formData.value = {
-        ...props.suiteToEdit,
-        description: props.suiteToEdit.description || '',
-        qdrant_collection: props.suiteToEdit.qdrant_collection,
-        embedding_model_id: props.suiteToEdit.embedding_model_id
-      };
-      parametersString.value = props.suiteToEdit.parameters ? JSON.stringify(props.suiteToEdit.parameters, null, 2) : '';
-    } else {
-      formData.value = {
-        name: '',
-        description: '',
-        system_prompt: '',
-        verification_method: 'EXACT_MATCH',
-        qdrant_collection: null,
-        embedding_model_id: null
-      };
-      parametersString.value = '';
-    }
-    await nextTick();
-    inputRef.value?.focus();
-  }
-});
+   if (isOpen) {
+     if (props.suiteToEdit) {
+       formData.value = {
+         ...props.suiteToEdit,
+         description: props.suiteToEdit.description || '',
+         qdrant_collection: props.suiteToEdit.qdrant_collection,
+         embedding_model_id: props.suiteToEdit.embedding_model_id,
+         eval_prompt: props.suiteToEdit.eval_prompt || ''
+       };
+       parametersString.value = props.suiteToEdit.parameters ? JSON.stringify(props.suiteToEdit.parameters, null, 2) : '';
+     } else {
+       formData.value = {
+         name: '',
+         description: '',
+         system_prompt: '',
+         verification_method: 'EXACT_MATCH',
+         qdrant_collection: null,
+         embedding_model_id: null,
+         eval_prompt: ''
+       };
+       parametersString.value = '';
+     }
+     await nextTick();
+     inputRef.value?.focus();
+   }
+ });
 
 const handleSave = () => {
   if (formData.value.name.trim() && formData.value.system_prompt.trim()) {
@@ -148,10 +151,16 @@ onUnmounted(() => {
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">System Prompt *</label>
-          <p class="text-xs text-gray-500 mb-2">Instrukcja główna, która zostanie wysłana do LLMa podczas wykonywania tego zbioru testów.</p>
-          <textarea v-model="formData.system_prompt" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm" placeholder="Jesteś asystentem AI. Twoim zadaniem jest..."></textarea>
-        </div>
+           <label class="block text-sm font-medium text-gray-700 mb-1">System Prompt *</label>
+           <p class="text-xs text-gray-500 mb-2">Instrukcja główna, która zostanie wysłana do LLMa podczas wykonywania tego zbioru testów.</p>
+           <textarea v-model="formData.system_prompt" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm" placeholder="Jesteś asystentem AI. Twoim zadaniem jest..."></textarea>
+         </div>
+
+         <div>
+           <label class="block text-sm font-medium text-gray-700 mb-1">Eval Prompt (opcjonalnie)</label>
+           <p class="text-xs text-gray-500 mb-2">Prompt używany do ewaluacji LLM jako sędziego. Jeśli nie zostanie podany, użyty zostanie domyślny prompt sędziego.</p>
+           <textarea v-model="formData.eval_prompt" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm" placeholder="Oceń zgodność odpowiedzi..." ></textarea>
+         </div>
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Parametry (JSON, opcjonalnie)</label>

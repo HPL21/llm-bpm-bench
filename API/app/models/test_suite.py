@@ -24,6 +24,7 @@ class TestSuite(Base):
     parameters: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True, default=None)
     qdrant_collection: Mapped[str | None] = mapped_column(String, nullable=True)
     embedding_model_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    eval_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     def __repr__(self) -> str:
