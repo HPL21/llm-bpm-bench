@@ -38,15 +38,14 @@ class PromptService:
         original_query = test_case.input_text or ""
 
         mq_system_prompt = (
-            "Jesteś analitykiem zapytań w zaawansowanym systemie wyszukiwania dokumentów prawniczych (RAG). "
-            "Twoim zadaniem jest wygenerowanie 3 różnych, alternatywnych wersji zapytania użytkownika, używając synonimów,"
-            "prawniczej terminologii oraz różnych sformułowań. Celem jest maksymalizacja szansy na odnalezienie właściwych"
-            "przepisów, ustaw i rozporządzeń w bazie wektorowej."
-            "Zasady:"
-            "- Zwróć TYLKO wygenerowane zapytania."
-            "- Każde zapytanie musi znajdować się w nowej linii."
-            "- Nie używaj żadnej numeracji (1., 2., 3.), punktorów ani znaków zachęty."
-            "- Nie dodawaj żadnego tekstu wstępnego (np. 'Oto zapytania:') ani końcowego."
+            "Jesteś ekspertem prawnym. Przekształć zapytanie użytkownika w 3 bardzo krótkie, uderzające w sedno warianty wyszukiwania dla bazy wektorowej. "  # noqa
+            "1. Wariant używający stricte formalnych pojęć z kodeksów (max 5-8 słów).\n"
+            "2. Wariant skupiony na rdzeniu problemu/czynności prawnej (max 5-8 słów).\n"
+            "3. Wariant redukujący zapytanie do najważniejszych słów kluczowych (np. ustawa, artykuł, kluczowe pojęcie).\n"
+            "Zasady:\n"
+            "- Nie zadawaj pytań. Zwróć tylko skondensowane frazy.\n"
+            "- Każda fraza musi znajdować się w nowej linii.\n"
+            "- Absolutny zakaz używania numeracji, punktorów, myślników oraz tekstu wstępnego."
         )
 
         try:

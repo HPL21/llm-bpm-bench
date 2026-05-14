@@ -2,9 +2,12 @@ import logging
 from uuid import uuid4
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.exceptions import UnexpectedResponse
+from sqlalchemy import select
 
 from app.core.config import settings
+from app.core.database import AsyncSessionLocal
 from app.models.file_asset import FileAsset
+from app.models.llm_model import LLMModel
 from app.services.embedding_service import embedding_service
 from app.services.storage_service import storage_service
 import pymupdf4llm
@@ -115,43 +118,50 @@ class QdrantService:
         cls,
         file_asset: FileAsset,
         collection_name: str,
-        model_id: str | None = None
+        model_id: str | None = None,
+        batch_size: int = 4
     ) -> int:
         """
-        Index a file into Qdrant using simple text extraction.
+        Index a file into Qdrant using simple text extraction with batching.
         """
         pages = cls._extract_text_from_file(file_asset)
 
         if not pages:
             return 0
 
+        async with AsyncSessionLocal() as db:
+            stmt = select(LLMModel).where(LLMModel.id == model_id)
+            result = await db.execute(stmt)
+            model_config = result.scalar_one_or_none()
+
         client = cls.get_client()
         indexed_count = 0
 
-        for page in pages:
-            page_text = page.get('text', '')
-            embedding = await embedding_service.encode([page_text], model_id=model_id)  # type: ignore
-
-            metadata = page.get('metadata', {})
-
-            cleaned_payload = {
-                "title": metadata.get("title", ""),
-                "page_count": metadata.get("page_count"),
-                "page_number": metadata.get("page_number"),
-                "text": page_text
-            }
-
-            point = models.PointStruct(
-                id=str(uuid4()),
-                vector=embedding[0],
-                payload=cleaned_payload
-            )
-
+        for i in range(0, len(pages), batch_size):
+            batch_pages = pages[i:i + batch_size]
+            batch_texts = [page.get('text', '') for page in batch_pages]
+            embeddings = await embedding_service.encode(batch_texts, model_config=model_config)
+            points = []
+            for j, page in enumerate(batch_pages):
+                metadata = page.get('metadata', {})
+                cleaned_payload = {
+                    "title": metadata.get("title", ""),
+                    "page_count": metadata.get("page_count"),
+                    "page_number": metadata.get("page_number"),
+                    "text": batch_texts[j]
+                }
+                points.append(
+                    models.PointStruct(
+                        id=str(uuid4()),
+                        vector=embeddings[j],
+                        payload=cleaned_payload
+                    )
+                )
             client.upsert(
                 collection_name=collection_name,
-                points=[point]
+                points=points
             )
-            indexed_count += 1
+            indexed_count += len(points)
 
         return indexed_count
 
@@ -202,7 +212,6 @@ class QdrantService:
         client = cls.get_client()
 
         embeddings = await embedding_service.encode(queries, model_id=model_id)
-        # logger.info(f"Pierwszy embedding dla Multi-Query: {embeddings[0]}")
 
         all_hits = []
         for query_embedding in embeddings:

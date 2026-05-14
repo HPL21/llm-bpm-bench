@@ -57,7 +57,8 @@ class WorkerService:
         verification_method: str,
         expected_text: str,
         judge_client: BaseLLMClient | None = None,
-        eval_prompt: str | None = None
+        eval_prompt: str | None = None,
+        question: str | None = None
     ) -> tuple:
         """
         Execute LLM and evaluate response.
@@ -81,7 +82,8 @@ class WorkerService:
             expected=expected_text,
             actual=cleaned_response_text,
             judge_client=judge_client,
-            system_prompt=eval_prompt
+            system_prompt=eval_prompt,
+            question=question
         )
 
         return cleaned_response_text, score, eval_details, latency_ms, prompt_tokens, completion_tokens
@@ -151,15 +153,18 @@ class WorkerService:
 
                     judge_client = LLMClientFactory.get_client(judge_model)
 
+                    question = test_case.input_text if test_suite.qdrant_collection else None
+
                 cleaned_response_text, score, eval_details, latency_ms, prompt_tokens, completion_tokens = await self._execute_llm_and_process(  # noqa
-                     client=client,
-                     prompt=combined_prompt,
-                     system_prompt=test_suite.system_prompt,
-                     images=images_list,
-                     verification_method=test_suite.verification_method,
-                     expected_text=expected_text,
-                     judge_client=judge_client,
-                     eval_prompt=test_suite.eval_prompt
+                    client=client,
+                    prompt=combined_prompt,
+                    system_prompt=test_suite.system_prompt,
+                    images=images_list,
+                    verification_method=test_suite.verification_method,
+                    expected_text=expected_text,
+                    judge_client=judge_client,
+                    eval_prompt=test_suite.eval_prompt,
+                    question=question
                  )
 
                 await self._save_results(

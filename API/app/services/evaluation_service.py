@@ -89,7 +89,8 @@ class EvaluationService:
         expected: str,
         actual: str,
         judge_client: BaseLLMClient | None = None,
-        system_prompt: str | None = None
+        system_prompt: str | None = None,
+        question: str | None = None
     ) -> Tuple[float, Dict[str, Any]]:
         """
         Ocena przy pomocy LLM jako sędziego.
@@ -111,9 +112,10 @@ class EvaluationService:
                 "gdzie X.XX to wartość punktowa od 0.0 do 1.0."
             )
 
-        judge_prompt = f"Oczekiwana odpowiedź:\n{expected}\n" + "#"*30 + f"\nOtrzymana odpowiedź:\n{actual}"
+        if question and question.strip():
+            judge_system_prompt += f"\nPytanie, na które odpowiada model: {question}"
 
-        logger.info(f"Przygotowano prompt sędziowski: {judge_system_prompt}")
+        judge_prompt = f"\nOczekiwana odpowiedź:\n{expected}\n" + "#"*30 + f"\nOtrzymana odpowiedź:\n{actual}"  # noqa
 
         try:
             response = await judge_client.generate(prompt=judge_prompt, system_prompt=judge_system_prompt)
@@ -153,7 +155,9 @@ class EvaluationService:
             return 0.0, {"error": error_reason}
 
     @classmethod
-    async def evaluate(cls, verification_method: str, expected: str, actual: str, **kwargs) -> Tuple[float, Dict[str, Any]]:
+    async def evaluate(
+        cls, verification_method: str, expected: str, actual: str, **kwargs
+    ) -> Tuple[float, Dict[str, Any]]:
         """Główna metoda wywołująca odpowiedni ewaluator na podstawie zadanego typu."""
         if verification_method == "EXACT_MATCH":
             return cls.evaluate_exact_match(expected, actual)
@@ -167,6 +171,7 @@ class EvaluationService:
                 actual,
                 judge_client=kwargs.get("judge_client"),
                 system_prompt=kwargs.get("system_prompt"),
+                question=kwargs.get("question")
             )
         else:
             raise ValueError(f"Nieobsługiwana metoda weryfikacji: {verification_method}")

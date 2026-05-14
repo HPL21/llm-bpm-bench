@@ -79,21 +79,30 @@ async def index_collection(request: IndexCollectionRequest):
 
             total_chunks = 0
             indexed_files = []
+            error_files = []
 
             for file_asset in files:
-                chunks_count = await qdrant_service.index_file(
-                    file_asset, request.collection_name, model_id=request.model_id
-                )
-                total_chunks += chunks_count
-                indexed_files.append({
-                    "file_id": str(file_asset.id),
-                    "filename": file_asset.filename,
-                    "chunks_indexed": chunks_count
-                })
+                try:
+                    chunks_count = await qdrant_service.index_file(
+                        file_asset, request.collection_name, model_id=request.model_id
+                    )
+                    total_chunks += chunks_count
+                    indexed_files.append({
+                        "file_id": str(file_asset.id),
+                        "filename": file_asset.filename,
+                        "chunks_indexed": chunks_count
+                    })
+                except Exception as e:
+                    error_files.append({
+                        "file_id": str(file_asset.id),
+                        "filename": file_asset.filename,
+                        "error": str(e)
+                    })
 
             return {
                 "message": f"Indexed {len(indexed_files)} files with {total_chunks} total chunks",
-                "files": indexed_files
+                "files": indexed_files,
+                "errors": error_files
             }
 
         except Exception as e:

@@ -134,9 +134,16 @@ class OpenAICompatibleClient(BaseLLMClient):
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings using OpenAI-compatible API."""
+        clean_texts = [t for t in texts if isinstance(t, str) and t.strip()]
+
+        if not clean_texts:
+            logger.warning("Pusta lista tekstów po oczyszczeniu, pomijam embedding.")
+            return []
+
         payload = {
             "model": self.model_name,
-            "input": texts
+            "input": clean_texts,
+            "encoding_format": "float"
         }
 
         headers = {"Content-Type": "application/json"}

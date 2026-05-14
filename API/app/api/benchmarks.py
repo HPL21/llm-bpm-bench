@@ -141,7 +141,7 @@ async def export_benchmark_runs_to_excel(
     """
     import io
     excel_data = await benchmark_service.export_to_excel(db, run_ids)
-    
+
     return StreamingResponse(
         io.BytesIO(excel_data),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
