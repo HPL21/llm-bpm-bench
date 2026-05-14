@@ -1,3 +1,4 @@
+import logging
 from uuid import uuid4
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.exceptions import UnexpectedResponse
@@ -9,6 +10,8 @@ from app.services.storage_service import storage_service
 import pymupdf4llm
 import os
 import tempfile
+
+logger = logging.getLogger("BenchmarkWorker")
 
 
 class QdrantService:
@@ -126,16 +129,22 @@ class QdrantService:
         indexed_count = 0
 
         for page in pages:
-            page_text = page.get('text')
+            page_text = page.get('text', '')
             embedding = await embedding_service.encode([page_text], model_id=model_id)  # type: ignore
 
-            page['filename'] = file_asset.filename
-            page['page_number'] = page.get('metadata', {}).get('page')
+            metadata = page.get('metadata', {})
+
+            cleaned_payload = {
+                "title": metadata.get("title", ""),
+                "page_count": metadata.get("page_count"),
+                "page_number": metadata.get("page_number"),
+                "text": page_text
+            }
 
             point = models.PointStruct(
                 id=str(uuid4()),
                 vector=embedding[0],
-                payload=page
+                payload=cleaned_payload
             )
 
             client.upsert(
@@ -173,9 +182,52 @@ class QdrantService:
             (
                 (hit.payload or {}).get("text", ""),
                 (hit.payload or {}).get("page_number"),
-                (hit.payload or {}).get("filename")
+                (hit.payload or {}).get("title")
             )
             for hit in response.points
+        ]
+
+    @classmethod
+    async def search_relevant_chunks_multiquery(
+        cls,
+        collection_name: str,
+        queries: list[str],
+        model_id: str | None = None,
+        limit: int = 5
+    ) -> list[tuple[str, int | None, str | None]]:
+        """
+        Search for relevant text chunks in Qdrant using multiple queries (Multi-Query RAG).
+        Deduplicates results based on point ID and returns the highest scoring chunks.
+        """
+        client = cls.get_client()
+
+        embeddings = await embedding_service.encode(queries, model_id=model_id)
+        # logger.info(f"Pierwszy embedding dla Multi-Query: {embeddings[0]}")
+
+        all_hits = []
+        for query_embedding in embeddings:
+            response = client.query_points(
+                collection_name=collection_name,
+                query=query_embedding,
+                limit=limit,
+                with_payload=True
+            )
+            all_hits.extend(response.points)
+
+        unique_hits = {}
+        for hit in all_hits:
+            if hit.id not in unique_hits or hit.score > unique_hits[hit.id].score:
+                unique_hits[hit.id] = hit
+
+        top_hits = sorted(unique_hits.values(), key=lambda x: x.score, reverse=True)[:limit]
+
+        return [
+            (
+                (hit.payload or {}).get("text", ""),
+                (hit.payload or {}).get("page_number"),
+                (hit.payload or {}).get("title")
+            )
+            for hit in top_hits
         ]
 
 

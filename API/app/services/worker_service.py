@@ -39,11 +39,12 @@ class WorkerService:
     async def _prepare_prompt_and_images(
         self,
         test_case: TestCase,
-        test_suite: TestSuite
+        test_suite: TestSuite,
+        client: BaseLLMClient
     ) -> tuple:
         """Prepare prompt and list of images"""
         if test_suite.qdrant_collection:
-            return await self.prompt_service.prepare_rag_prompt(test_case, test_suite)
+            return await self.prompt_service.prepare_rag_prompt(test_case, test_suite, client)
         else:
             return await self.prompt_service.prepare_standard_prompt(test_case)
 
@@ -130,7 +131,7 @@ class WorkerService:
                 logger.info(f"Procesowanie [{execution_id}]: Model='{llm_model.name}', TestCase='{test_case.id}'")
                 client = LLMClientFactory.get_client(llm_model)
 
-                combined_prompt, images_list = await self._prepare_prompt_and_images(test_case, test_suite)
+                combined_prompt, images_list = await self._prepare_prompt_and_images(test_case, test_suite, client)
 
                 expected_text = test_case.expected_output or ""
 

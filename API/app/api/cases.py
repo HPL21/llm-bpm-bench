@@ -130,22 +130,29 @@ async def import_cases_from_csv(
             )
         file_map = {f.filename: f.id for f in found_files}
 
+    cases_to_create = []
     created_cases = []
-    for row in rows:
+    for i, row in enumerate(rows):
         file_ids = []
         if 'filenames' in reader.fieldnames and row.get('filenames'):
             files = [f.strip() for f in row['filenames'].split('###') if f.strip()]
             file_ids = [file_map[f] for f in files if f in file_map]
 
         input_text = row.get('input_text', "")
+        expected_output = row.get('expected_response')
+
+        if not expected_output:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Wiersz {i + 1} musi zawierać wartość w kolumnie 'expected_response'."
+            )
 
         case_in = TestCaseCreate(
             suite_id=suite_id,
             input_text=input_text,
-            expected_output=row['expected_response'].strip('\"'),
+            expected_output=expected_output.strip('\"'),
             file_ids=file_ids
         )
-        created = await case_service.create(db, case_in)
-        created_cases.append(created)
-
+        cases_to_create.append(case_in)
+    created_cases = await case_service.bulk_create(db, cases_to_create)
     return {"message": "Pomyślnie zaimportowano", "count": len(created_cases)}

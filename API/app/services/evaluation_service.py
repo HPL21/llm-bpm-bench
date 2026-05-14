@@ -1,8 +1,11 @@
 import json
+import logging
 import re
 from typing import Any, Dict, Tuple
 from rapidfuzz import fuzz, utils
 from app.core.llm_clients import BaseLLMClient
+
+logger = logging.getLogger("BenchmarkWorker")
 
 
 class EvaluationException(Exception):
@@ -109,6 +112,8 @@ class EvaluationService:
             )
 
         judge_prompt = f"Oczekiwana odpowiedź:\n{expected}\n" + "#"*30 + f"\nOtrzymana odpowiedź:\n{actual}"
+
+        logger.info(f"Przygotowano prompt sędziowski: {judge_system_prompt}")
 
         try:
             response = await judge_client.generate(prompt=judge_prompt, system_prompt=judge_system_prompt)

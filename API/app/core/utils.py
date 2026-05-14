@@ -1,7 +1,7 @@
 import json_repair
 
 
-def clean_llm_response(response: str, verification_method: str) -> str:
+def clean_llm_response(response: str, verification_method: str | None = None) -> str:
     """
     Cleans LLM response by:
     1. Removing everything up to and including </think> tag (if present)

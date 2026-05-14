@@ -34,7 +34,7 @@ class BaseLLMClient(ABC):
         self.model_config = model_config
         self.base_url = model_config.api_base_url.rstrip("/")
         self.model_name = model_config.model_identifier
-        self.timeout = httpx.Timeout(300.0, connect=10.0)
+        self.timeout = httpx.Timeout(900.0)
 
     @abstractmethod
     async def generate(

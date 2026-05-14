@@ -45,6 +45,31 @@ class CaseService:
         await db.refresh(db_case)
         return db_case
 
+    async def bulk_create(self, db: AsyncSession, cases: Sequence[TestCaseCreate]) -> list[TestCase]:
+        """Bulk create test cases."""
+        db_cases = []
+        for schema in cases:
+            db_case = TestCase(
+                suite_id=schema.suite_id,
+                input_text=schema.input_text,
+                expected_output=schema.expected_output,
+            )
+
+            if schema.file_ids:
+                files_result = await db.execute(
+                    select(FileAsset).where(FileAsset.id.in_(schema.file_ids))
+                )
+                files = files_result.scalars().all()
+                db_case.files = list(files)
+
+            db_cases.append(db_case)
+
+        db.add_all(db_cases)
+        await db.commit()
+        for db_case in db_cases:
+            await db.refresh(db_case)
+        return db_cases
+
     async def delete(self, db: AsyncSession, case_id: UUID) -> None:
         """Delete a test case."""
         result = await db.execute(select(TestCase).where(TestCase.id == case_id))

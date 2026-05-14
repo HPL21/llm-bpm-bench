@@ -2,6 +2,8 @@ import asyncio
 import logging
 from typing import Optional, List, Tuple
 
+from app.core.llm_clients import BaseLLMClient
+from app.core.utils import clean_llm_response
 from app.models.test_case import TestCase
 from app.models.test_suite import TestSuite
 from app.services.file_processing_service import FileProcessingService
@@ -12,9 +14,13 @@ logger = logging.getLogger("BenchmarkWorker")
 RAG_PROMPT_TEMPLATE = """Kontekst z bazy wiedzy:
 {context}
 
+##############################################################
+
 Pytanie: {question}
 
-Odpowiedz na pytanie korzystając wyłącznie z podanego kontekstu. Jeśli odpowiedź nie znajduje się w kontekście, napisz "Brak odpowiedzi w dostępnym kontekście"."""
+##############################################################
+
+Odpowiedz na pytanie korzystając wyłącznie z podanego kontekstu. Jeśli odpowiedź nie znajduje się w kontekście, napisz "Brak odpowiedzi w dostępnym kontekście"."""  # noqa
 
 
 class PromptService:
@@ -23,16 +29,43 @@ class PromptService:
     @staticmethod
     async def prepare_rag_prompt(
         test_case: TestCase,
-        test_suite: TestSuite
+        test_suite: TestSuite,
+        client: BaseLLMClient
     ) -> Tuple[str, Optional[List]]:
         """
-        Prepare RAG prompt with context from Qdrant.
-        Returns (prompt, images_list).
+        Prepare RAG prompt using Multi-Query generation via the tested LLM.
         """
-        logger.info(f"Tryb RAG: wyszukiwanie w kolekcji '{test_suite.qdrant_collection}'")
-        relevant_chunks = await qdrant_service.search_relevant_chunks(
+        original_query = test_case.input_text or ""
+
+        mq_system_prompt = (
+            "Jesteś analitykiem zapytań w zaawansowanym systemie wyszukiwania dokumentów prawniczych (RAG). "
+            "Twoim zadaniem jest wygenerowanie 3 różnych, alternatywnych wersji zapytania użytkownika, używając synonimów,"
+            "prawniczej terminologii oraz różnych sformułowań. Celem jest maksymalizacja szansy na odnalezienie właściwych"
+            "przepisów, ustaw i rozporządzeń w bazie wektorowej."
+            "Zasady:"
+            "- Zwróć TYLKO wygenerowane zapytania."
+            "- Każde zapytanie musi znajdować się w nowej linii."
+            "- Nie używaj żadnej numeracji (1., 2., 3.), punktorów ani znaków zachęty."
+            "- Nie dodawaj żadnego tekstu wstępnego (np. 'Oto zapytania:') ani końcowego."
+        )
+
+        try:
+            mq_response, _, _ = await client.generate(
+                prompt=original_query,
+                system_prompt=mq_system_prompt
+            )
+            cleaned_mq_response = clean_llm_response(mq_response)
+            generated_queries = [q.strip() for q in cleaned_mq_response.split('\n') if q.strip()]
+            queries = [original_query] + generated_queries[:3]
+            logger.info(f"Wygenerowano warianty Multi-Query: {generated_queries[:3]}")
+        except Exception as e:
+            logger.warning(f"Błąd generowania wariantów Multi-Query: {e}. Używam tylko oryginału.")
+            queries = [original_query]
+
+        logger.info(f"Tryb RAG: wyszukiwanie w '{test_suite.qdrant_collection}' dla {len(queries)} zapytań")
+        relevant_chunks = await qdrant_service.search_relevant_chunks_multiquery(
             collection_name=test_suite.qdrant_collection,  # type: ignore
-            query=test_case.input_text or "",
+            queries=queries,
             model_id=str(test_suite.embedding_model_id) if test_suite.embedding_model_id else None,
             limit=5
         )
@@ -44,11 +77,15 @@ class PromptService:
                 context_parts.append(f"[Plik: {filename}, Strona: {page_num}]\n{text}")
             else:
                 context_parts.append(text)
-        context = "\n\n".join(context_parts) if context_parts else "Brak kontekstu."
+
+        logger.info(f"Znaleziono {len(relevant_chunks)} istotnych fragmentów dla zapytań Multi-Query.")
+
+        context = "\n#########\n".join(context_parts) if context_parts else "Brak kontekstu."
         combined_prompt = RAG_PROMPT_TEMPLATE.format(
             context=context,
-            question=test_case.input_text or ""
+            question=original_query
         )
+
         return combined_prompt, None
 
     @staticmethod
