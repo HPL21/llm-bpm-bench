@@ -67,6 +67,7 @@ services:
       context: ./API
       dockerfile: Dockerfile
     container_name: llm_api
+    restart: unless-stopped
     command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./API:/app
@@ -96,6 +97,7 @@ services:
       context: ./API
       dockerfile: Dockerfile
     container_name: llm_worker
+    restart: unless-stopped
     command: uv run python -m app.worker_main
     volumes:
       - ./API:/app
