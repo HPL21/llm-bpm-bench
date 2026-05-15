@@ -120,6 +120,20 @@ services:
         reservations:
           memory: 256M
 
+  gui:
+    build:
+      context: ./GUI
+      dockerfile: Dockerfile
+    container_name: llm_gui
+    restart: unless-stopped
+    volumes:
+      - ./GUI:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://api:8000
+
 volumes:
   postgres_data:
   minio_data:
