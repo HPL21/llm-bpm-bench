@@ -124,6 +124,7 @@ class WorkerService:
         prompt_tokens = None
         completion_tokens = None
         score = None
+        question = None
         eval_details = {}
 
         async with AsyncSessionLocal() as db:

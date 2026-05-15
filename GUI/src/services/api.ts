@@ -203,24 +203,29 @@ export const BenchmarkService = {
     const response = await api.get<BenchmarkRun[]>('/benchmarks/runs');
     return response.data;
   },
-  
+   
   async getRunDetails(id: string) {
     const response = await api.get<BenchmarkRunDetail>(`/benchmarks/runs/${id}`);
     return response.data;
   },
-  
+   
   async createRun(data: BenchmarkRunCreate) {
     const response = await api.post<BenchmarkRun>('/benchmarks/runs', data);
     return response.data;
   },
-  
+   
   async cancelRun(id: string) {
     const response = await api.post(`/benchmarks/runs/${id}/cancel`);
     return response.data;
   },
-  
+   
   async getRunSummary(runId: string) {
     const response = await api.get(`/benchmarks/runs/${runId}/summary`);
+    return response.data;
+  },
+
+  async repeatExecution(executionId: string) {
+    const response = await api.post(`/benchmarks/executions/${executionId}/repeat`);
     return response.data;
   },
 

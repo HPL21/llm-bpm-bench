@@ -269,5 +269,36 @@ class BenchmarkService:
         excel_bytes.seek(0)
         return excel_bytes.read()
 
+    async def repeat_execution(self, db: AsyncSession, execution_id: UUID) -> Optional[BenchmarkExecution]:
+        """
+        Reset an execution to PENDING status and clear all result fields so it can be processed again.
+        """
+        stmt = (
+            select(BenchmarkExecution)
+            .where(BenchmarkExecution.id == execution_id)
+            .options(
+                selectinload(BenchmarkExecution.llm_model),
+                selectinload(BenchmarkExecution.test_case),
+            )
+        )
+        result = await db.execute(stmt)
+        execution = result.scalar_one_or_none()
+
+        if not execution:
+            return None
+
+        execution.status = ExecutionStatus.PENDING
+        execution.response_text = None
+        execution.score = None
+        execution.error_message = None
+        execution.prompt_tokens = None
+        execution.completion_tokens = None
+        execution.latency_ms = None
+
+        await db.commit()
+        await db.refresh(execution)
+
+        return execution
+
 
 benchmark_service = BenchmarkService()

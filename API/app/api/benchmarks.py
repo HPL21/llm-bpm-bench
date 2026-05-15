@@ -66,6 +66,33 @@ async def get_benchmark_runs(db: AsyncSession = Depends(get_db)):
     return response
 
 
+@router.post("/executions/{execution_id}/repeat", status_code=status.HTTP_200_OK)
+async def repeat_execution(
+    execution_id: UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Powtarza pojedyncze wykonanie benchmarku: ustawia status na PENDING
+    i czyści pola wynikowe (response_text, score, error_message,
+    prompt_tokens, completion_tokens, latency_ms).
+    """
+    execution = await benchmark_service.repeat_execution(db, execution_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Nie znaleziono wykonania o podanym ID.")
+
+    return {
+        "id": execution.id,
+        "status": execution.status,
+        "response_text": execution.response_text,
+        "score": execution.score,
+        "error_message": execution.error_message,
+        "prompt_tokens": execution.prompt_tokens,
+        "completion_tokens": execution.completion_tokens,
+        "latency_ms": execution.latency_ms,
+    }
+
+
 @router.post("/runs/delete", status_code=status.HTTP_200_OK)
 async def delete_benchmark_runs(
     run_ids: List[UUID],

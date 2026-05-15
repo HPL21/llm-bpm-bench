@@ -26,7 +26,19 @@ const selectedExecution = ref<BenchmarkExecution | null>(null);
 let pollInterval: number;
 
 const closeModal = () => {
-  selectedExecution.value = null;
+   selectedExecution.value = null;
+ };
+
+const repeatExecution = async () => {
+  if (!selectedExecution.value) return;
+  try {
+    await BenchmarkService.repeatExecution(selectedExecution.value.id);
+  } catch (error) {
+    alert("Nie udało się powtórzyć testu.");
+  } finally {
+    closeModal();
+    await fetchDetails();
+  }
 };
 
 const handleKeydown = (e: KeyboardEvent) => {
@@ -342,10 +354,16 @@ const diffResult = computed(() => {
               *
               100).toFixed(1) + '%' : 'Brak oceny' }}</span>
           </span>
-          <button @click="closeModal"
-            class="px-6 py-2 bg-white border rounded-md hover:bg-gray-50 font-medium shadow-sm transition-colors">
-            Zamknij (ESC)
-          </button>
+          <div class="flex items-center space-x-3">
+            <button @click="repeatExecution"
+              class="px-3 py-2 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-100 text-sm font-medium">
+              Powtórz test
+            </button>
+            <button @click="closeModal"
+              class="px-6 py-2 bg-white border rounded-md hover:bg-gray-50 font-medium shadow-sm transition-colors">
+              Zamknij (ESC)
+            </button>
+          </div>
         </div>
       </div>
     </div>
