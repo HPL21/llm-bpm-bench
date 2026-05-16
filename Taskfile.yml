@@ -95,7 +95,6 @@ tasks:
       - docker compose stop api
       - docker compose rm -f api
       - docker compose up -d --build api
-      - docker compose logs -f api
 
   worker-build:
     desc: Rebuild worker container (use after code changes)

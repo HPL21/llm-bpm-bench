@@ -53,6 +53,7 @@ class BaseLLMClient(ABC):
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(url, **kwargs)
+                elapsed = response.elapsed.total_seconds()
                 if response.status_code >= 400:
                     error_detail = response.text
                     try:
@@ -68,6 +69,9 @@ class BaseLLMClient(ABC):
                         f"Błąd API LLM ({response.status_code}) dla {self.model_name}. "
                         f"Szczegóły: {error_detail}"
                     )
+
+                    if response.status_code == 504:
+                        logger.error(f"Model {self.model_name} przekroczył czas oczekiwania ({elapsed:.2f}s).")
 
                     raise LLMAPIError(
                         message=f"API Error {response.status_code}: {error_detail}",

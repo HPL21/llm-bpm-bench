@@ -30,18 +30,28 @@ const closeModal = () => {
  };
 
 const repeatExecution = async () => {
-  if (!selectedExecution.value) return;
-  try {
-    await BenchmarkService.repeatExecution(selectedExecution.value.id);
-  } catch (error) {
-    alert("Nie udało się powtórzyć testu.");
-  } finally {
-    closeModal();
-    await fetchDetails();
-  }
-};
+   if (!selectedExecution.value) return;
+   try {
+     await BenchmarkService.repeatExecution(selectedExecution.value.id);
+   } catch (error) {
+     alert("Nie udało się powtórzyć testu.");
+   } finally {
+     closeModal();
+     await fetchDetails();
+   }
+ };
 
-const handleKeydown = (e: KeyboardEvent) => {
+ const repeatFailedExecutions = async () => {
+   try {
+     await BenchmarkService.repeatFailedExecutions(props.id);
+   } catch (error) {
+     alert("Nie udało się powtórzyć nieudanych testów.");
+   } finally {
+     await fetchDetails();
+   }
+ };
+
+ const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape' && selectedExecution.value) {
     closeModal();
   }
@@ -89,7 +99,7 @@ onMounted(async () => {
   window.addEventListener('keydown', handleKeydown);
 
   pollInterval = window.setInterval(() => {
-    if (run.value && ['PENDING', 'PROCESSING'].includes(run.value.status)) {
+    if (run.value && ['PENDING', 'RUNNING'].includes(run.value.status)) {
       fetchDetails();
     }
   }, 3000);
@@ -112,6 +122,7 @@ const getStatusColor = (status: string) => {
     case 'PENDING': return 'text-gray-600 bg-gray-100';
     case 'PROCESSING': return 'text-blue-600 bg-blue-100';
     case 'CANCELLED': return 'text-gray-500 bg-gray-200';
+    case 'RUNNING': return 'bg-yellow-100 text-yellow-800';
     default: return 'text-gray-600 bg-gray-100';
   }
 };
@@ -153,18 +164,22 @@ const diffResult = computed(() => {
           <p class="text-sm text-gray-500">ID: {{ run.id }} | Utworzono: {{ formatDate(run.created_at) }}</p>
         </div>
 
-        <div class="flex items-center space-x-3">
-          <span :class="['px-3 py-1 text-sm font-semibold rounded-full', getStatusColor(run.status)]">
-            {{ run.status }}
-          </span>
-          <button @click="fetchDetails" class="p-2 bg-white border rounded hover:bg-gray-50" title="Odśwież">
-            <RefreshCwIcon class="w-4 h-4 text-gray-600" />
-          </button>
-          <button v-if="['PENDING', 'PROCESSING'].includes(run.status)" @click="cancelRun"
-            class="flex items-center px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 text-sm font-medium">
-            <BanIcon class="w-4 h-4 mr-1" /> Anuluj
-          </button>
-        </div>
+         <div class="flex items-center space-x-3">
+           <span :class="['px-3 py-1 text-sm font-semibold rounded-full', getStatusColor(run.status)]">
+             {{ run.status }}
+           </span>
+           <button @click="fetchDetails" class="p-2 bg-white border rounded hover:bg-gray-50" title="Odśwież">
+             <RefreshCwIcon class="w-4 h-4 text-gray-600" />
+           </button>
+           <button v-if="run.failed_executions > 0" @click="repeatFailedExecutions"
+             class="flex items-center px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 text-sm font-medium">
+             <RefreshCwIcon class="w-4 h-4 mr-1" /> Powtórz nieudane
+           </button>
+           <button v-if="['PENDING', 'RUNNING'].includes(run.status)" @click="cancelRun"
+             class="flex items-center px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 text-sm font-medium">
+             <BanIcon class="w-4 h-4 mr-1" /> Anuluj
+           </button>
+         </div>
       </div>
 
       <div class="bg-white rounded-lg shadow-sm border p-5">

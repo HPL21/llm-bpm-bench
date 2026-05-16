@@ -148,6 +148,35 @@ async def cancel_benchmark_run(run_id: UUID, db: AsyncSession = Depends(get_db))
     return {"message": "Benchmark został pomyślnie anulowany."}
 
 
+@router.post("/runs/{run_id}/repeat-failed", response_model=BenchmarkRunDetailResponse)
+async def repeat_failed_executions(run_id: UUID, db: AsyncSession = Depends(get_db)):
+    """
+    Powtarza wszystkie nieudane wykonania w danym uruchomieniu benchmarku:
+    ustawia status na PENDING i czyści pola wynikowe dla każdego nieudanego wykonania.
+    """
+    run = await benchmark_service.repeat_failed_executions(db, run_id)
+
+    if not run:
+        raise HTTPException(status_code=404, detail="Nie znaleziono takiego benchmarku.")
+
+    total = len(run.executions)
+    completed = sum(1 for e in run.executions if e.status == ExecutionStatus.COMPLETED)
+    failed = sum(1 for e in run.executions if e.status == ExecutionStatus.FAILED)
+    pending = sum(1 for e in run.executions if e.status in [ExecutionStatus.PENDING, ExecutionStatus.PROCESSING])
+
+    return BenchmarkRunDetailResponse(
+        id=run.id,
+        name=run.name,
+        status=run.status,
+        created_at=run.created_at,
+        total_executions=total,
+        completed_executions=completed,
+        failed_executions=failed,
+        pending_executions=pending,
+        executions=run.executions  # type: ignore
+    )
+
+
 @router.get("/runs/{run_id}/summary")
 async def get_benchmark_summary(run_id: UUID, db: AsyncSession = Depends(get_db)):
     """

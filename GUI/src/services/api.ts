@@ -229,6 +229,11 @@ export const BenchmarkService = {
     return response.data;
   },
 
+  async repeatFailedExecutions(runId: string) {
+    const response = await api.post(`/benchmarks/runs/${runId}/repeat-failed`);
+    return response.data;
+  },
+
   async deleteRuns(ids: string[]) {
     const response = await api.post(`/benchmarks/runs/delete`, ids);
     return response.data;

@@ -107,8 +107,12 @@ class BenchmarkService:
         total = len(run.executions)
         completed = sum(1 for e in run.executions if e.status == ExecutionStatus.COMPLETED)
         failed = sum(1 for e in run.executions if e.status == ExecutionStatus.FAILED)
+        processing = sum(1 for e in run.executions if e.status == ExecutionStatus.PROCESSING)
 
-        if total > 0 and (completed + failed) == total and run.status != RunStatus.COMPLETED:
+        if processing > 0 and run.status != RunStatus.RUNNING:
+            run.status = RunStatus.RUNNING
+            await db.commit()
+        elif total > 0 and (completed + failed) == total and run.status != RunStatus.COMPLETED:
             run.status = RunStatus.COMPLETED
             await db.commit()
 
@@ -287,6 +291,16 @@ class BenchmarkService:
         if not execution:
             return None
 
+        self._reset_execution(execution)
+        await db.commit()
+        await db.refresh(execution)
+
+        return execution
+
+    def _reset_execution(self, execution: BenchmarkExecution) -> None:
+        """
+        Reset an execution to PENDING status and clear all result fields.
+        """
         execution.status = ExecutionStatus.PENDING
         execution.response_text = None
         execution.score = None
@@ -295,10 +309,38 @@ class BenchmarkService:
         execution.completion_tokens = None
         execution.latency_ms = None
 
-        await db.commit()
-        await db.refresh(execution)
+    async def repeat_failed_executions(self, db: AsyncSession, run_id: UUID) -> Optional[BenchmarkRun]:
+        """
+        Reset all failed executions in a run to PENDING status and clear their result fields.
+        Updates the run status after resetting the executions.
+        """
+        stmt = (
+            select(BenchmarkRun)
+            .where(BenchmarkRun.id == run_id)
+            .options(
+                selectinload(BenchmarkRun.executions).joinedload(BenchmarkExecution.llm_model),
+                selectinload(BenchmarkRun.executions).joinedload(BenchmarkExecution.test_case)
+            )
+        )
+        result = await db.execute(stmt)
+        run = result.scalar_one_or_none()
 
-        return execution
+        if not run:
+            return None
+
+        any_reset = False
+        for execution in run.executions:
+            if execution.status == ExecutionStatus.FAILED:
+                self._reset_execution(execution)
+                any_reset = True
+
+        if any_reset:
+            run.status = RunStatus.PENDING
+
+        await db.commit()
+        await db.refresh(run)
+
+        return run
 
 
 benchmark_service = BenchmarkService()
