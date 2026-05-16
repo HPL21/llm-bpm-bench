@@ -2,6 +2,8 @@ version: '3'
 
 vars:
   API_CONTAINER: llm_api
+  WORKER_CONTAINER: llm_worker
+  GUI_CONTAINER: llm_gui
 
 tasks:
   default:
@@ -13,12 +15,27 @@ tasks:
     desc: Start the whole environment in the background (Docker Compose)
     cmds:
       - docker compose up -d
-      - echo "Environment started! Swagger: http://localhost:8000/docs"
+      - echo Environment started! Swagger available at http://localhost:8000/docs
 
   down:
     desc: Stop and remove all containers
     cmds:
       - docker compose down
+
+  down-worker:
+    desc: Stop and remove worker container
+    cmds:
+      - docker compose down worker
+
+  down-api:
+    desc: Stop and remove API container
+    cmds:
+      - docker compose down api
+
+  down-gui:
+    desc: Stop and remove GUI container
+    cmds:
+      - docker compose down gui
 
   stop:
     desc: Stop containers without removing them (can be resumed later)
@@ -29,6 +46,110 @@ tasks:
     desc: Quick restart of the API service (useful when changing config/env)
     cmds:
       - docker compose restart api
+
+  worker-restart:
+    desc: Stop, remove, rebuild and restart worker (full refresh)
+    cmds:
+      - docker compose stop worker
+      - docker compose rm -f worker
+      - docker compose up -d --build worker
+      - docker compose logs -f worker
+
+  gui-restart:
+    desc: Stop, remove, rebuild and restart GUI (full refresh)
+    cmds:
+      - docker compose stop gui
+      - docker compose rm -f gui
+      - docker compose up -d --build gui
+      - docker compose logs -f gui
+
+  gui-build:
+    desc: Rebuild GUI container
+    cmds:
+      - docker compose stop gui
+      - docker compose up -d --build gui
+
+  gui-stop:
+    desc: Stop the GUI container
+    cmds:
+      - docker compose stop gui
+
+  gui-start:
+    desc: Start the GUI container
+    cmds:
+      - docker compose start gui
+
+  gui-logs:
+    desc: Follow GUI logs in real-time
+    cmds:
+      - docker compose logs -f gui
+
+  gui-bash:
+    desc: Enter the GUI container shell
+    cmds:
+      - docker exec -it {{.GUI_CONTAINER}} /bin/sh
+
+  api-rebuild:
+    desc: Stop, remove, rebuild and restart API (full refresh)
+    cmds:
+      - docker compose stop api
+      - docker compose rm -f api
+      - docker compose up -d --build api
+      - docker compose logs -f api
+
+  worker-build:
+    desc: Rebuild worker container (use after code changes)
+    cmds:
+      - docker compose stop worker
+      - docker compose up -d --build worker
+
+  api-stop:
+    desc: Stop the API container
+    cmds:
+      - docker compose stop api
+
+  api-start:
+    desc: Start the API container
+    cmds:
+      - docker compose start api
+
+  worker-stop:
+    desc: Stop the worker container
+    cmds:
+      - docker compose stop worker
+
+  worker-start:
+    desc: Start the worker container
+    cmds:
+      - docker compose start worker
+
+  worker-logs:
+    desc: Follow worker logs in real-time
+    cmds:
+      - docker compose logs -f worker
+
+  ps:
+    desc: List running containers
+    cmds:
+      - docker compose ps
+
+  clean-worker:
+    desc: Stop and remove worker container (keeps data)
+    cmds:
+      - docker compose stop worker
+      - docker compose rm -f worker
+
+  clean-api:
+    desc: Stop and remove API container (keeps data)
+    cmds:
+      - docker compose stop api
+      - docker compose rm -f api
+
+  clean-gui:
+    desc: Stop and remove GUI container (keeps data)
+    cmds:
+      - docker compose stop gui
+      - docker compose rm -f gui
 
   build:
     desc: Rebuild containers (use this after adding new libraries via 'uv add')
@@ -50,16 +171,34 @@ tasks:
     cmds:
       - docker exec -it {{.API_CONTAINER}} /bin/bash
 
+  worker-bash:
+    desc: Enter the worker container shell
+    cmds:
+      - docker exec -it {{.WORKER_CONTAINER}} /bin/bash
+
   lint:
     desc: Auto-format and fix code (Ruff)
     dir: API
     cmds:
       - uv run ruff check --fix .
       - uv run ruff format .
-      - echo "Code cleaned!"
+      - echo Code cleaned!
 
   clean:
-    desc: Clean everything (removes containers and volumes - WARNING: deletes database!)
-    prompt: Are you sure you want to delete the database and all files?
+    desc: "Clean everything (removes containers and volumes - WARNING: deletes database!)"
+    prompt: "Are you sure you want to delete the database and all files?"
     cmds:
       - docker compose down -v --remove-orphans
+
+  prune:
+    desc: Remove orphaned containers and unused volumes
+    cmds:
+      - docker compose down --remove-orphans
+      - docker volume prune -f
+
+  rebuild-all:
+    desc: Stop all, remove, rebuild and start everything
+    cmds:
+      - docker compose down
+      - docker compose up -d --build
+      - docker compose ps
