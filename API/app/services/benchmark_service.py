@@ -208,7 +208,7 @@ class BenchmarkService:
             ] for item in summary_data
         ], key=lambda x: (x[0], x[1]))
 
-        wb = Workbook()
+        wb = Workbook()  # type: ignore
         ws = wb.active
         ws.title = "Benchmark Results"  # type: ignore
 

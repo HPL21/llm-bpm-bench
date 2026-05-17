@@ -173,7 +173,7 @@ async def get_benchmark_summary(run_id: UUID, db: AsyncSession = Depends(get_db)
     Zwraca zagregowane podsumowanie dla danego uruchomienia benchmarku:
     średnią poprawność, czas i zużycie tokenów pogrupowane po modelu i zbiorze testowym.
     """
-    summary = await benchmark_service.get_run_summary(db, run_id)
+    summary = await benchmark_service.get_runs_summary(db, [run_id])
     return summary
 
 

@@ -147,10 +147,12 @@ async def import_cases_from_csv(
                 detail=f"Wiersz {i + 1} musi zawierać wartość w kolumnie 'expected_response'."
             )
 
+        parsed_expected_output = expected_output.strip('\"').replace('\\n', '\n')
+
         case_in = TestCaseCreate(
             suite_id=suite_id,
             input_text=input_text,
-            expected_output=expected_output.strip('\"'),
+            expected_output=parsed_expected_output,
             file_ids=file_ids
         )
         cases_to_create.append(case_in)
