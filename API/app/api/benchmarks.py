@@ -4,7 +4,6 @@ from typing import List, Any
 from uuid import UUID
 from fastapi.responses import StreamingResponse
 from app.core.database import get_db
-from app.models.benchmark_execution import ExecutionStatus
 from app.schemas.benchmark import (
     BenchmarkRunCreate,
     BenchmarkRunResponse,
@@ -31,7 +30,7 @@ async def create_benchmark_run(
         raise HTTPException(status_code=400, detail="Nie wybrano żadnego zbioru testowego.")
 
     try:
-        new_run = await benchmark_service.create_run(db, payload)
+        new_run, total_executions = await benchmark_service.create_run(db, payload)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -39,7 +38,7 @@ async def create_benchmark_run(
         id=new_run.id,
         name=new_run.name,
         status=new_run.status,
-        total_executions=len(new_run.executions),
+        total_executions=total_executions,
         created_at=new_run.created_at
     )
 
@@ -49,21 +48,18 @@ async def get_benchmark_runs(db: AsyncSession = Depends(get_db)):
     """
     Zwraca listę wszystkich uruchomień benchmarków (pomija usunięte).
     """
-    runs = await benchmark_service.get_all_runs(db)
+    runs_with_counts = await benchmark_service.get_all_runs(db)
 
-    response = []
-    for run in runs:
-        response.append(
-            BenchmarkRunResponse(
-                id=run.id,
-                name=run.name,
-                status=run.status,
-                total_executions=len(run.executions),
-                created_at=run.created_at
-            )
+    return [
+        BenchmarkRunResponse(
+            id=row.BenchmarkRun.id,
+            name=row.BenchmarkRun.name,
+            status=row.BenchmarkRun.status,
+            total_executions=row.total_executions,
+            created_at=row.BenchmarkRun.created_at
         )
-
-    return response
+        for row in runs_with_counts
+    ]
 
 
 @router.post("/executions/{execution_id}/repeat", status_code=status.HTTP_200_OK)
@@ -111,25 +107,22 @@ async def get_benchmark_run_details(run_id: UUID, db: AsyncSession = Depends(get
     Zwraca szczegóły uruchomienia, wylicza postęp (statystyki z zadań podrzędnych)
     oraz zwraca listę wszystkich egzekucji.
     """
-    run = await benchmark_service.get_run_details(db, run_id)
+    result = await benchmark_service.get_run_details(db, run_id)
 
-    if not run:
+    if not result:
         raise HTTPException(status_code=404, detail="Nie znaleziono takiego benchmarku.")
 
-    total = len(run.executions)
-    completed = sum(1 for e in run.executions if e.status == ExecutionStatus.COMPLETED)
-    failed = sum(1 for e in run.executions if e.status == ExecutionStatus.FAILED)
-    pending = sum(1 for e in run.executions if e.status in [ExecutionStatus.PENDING, ExecutionStatus.PROCESSING])
+    run, stats = result
 
     return BenchmarkRunDetailResponse(
         id=run.id,
         name=run.name,
         status=run.status,
         created_at=run.created_at,
-        total_executions=total,
-        completed_executions=completed,
-        failed_executions=failed,
-        pending_executions=pending,
+        total_executions=stats["total"],
+        completed_executions=stats["completed"],
+        failed_executions=stats["failed"],
+        pending_executions=stats["pending"],
         executions=run.executions  # type: ignore
     )
 
@@ -140,9 +133,9 @@ async def cancel_benchmark_run(run_id: UUID, db: AsyncSession = Depends(get_db))
     Anuluje uruchomienie. Wszystkie zadania, które mają status PENDING
     zostaną zmienione na CANCELLED. Workery po prostu ich nie podejmą.
     """
-    run = await benchmark_service.cancel_run(db, run_id)
+    success = await benchmark_service.cancel_run(db, run_id)
 
-    if not run:
+    if not success:
         raise HTTPException(status_code=404, detail="Nie znaleziono takiego benchmarku lub nie można go anulować.")
 
     return {"message": "Benchmark został pomyślnie anulowany."}
@@ -154,25 +147,22 @@ async def repeat_failed_executions(run_id: UUID, db: AsyncSession = Depends(get_
     Powtarza wszystkie nieudane wykonania w danym uruchomieniu benchmarku:
     ustawia status na PENDING i czyści pola wynikowe dla każdego nieudanego wykonania.
     """
-    run = await benchmark_service.repeat_failed_executions(db, run_id)
+    result = await benchmark_service.repeat_failed_executions(db, run_id)
 
-    if not run:
+    if not result:
         raise HTTPException(status_code=404, detail="Nie znaleziono takiego benchmarku.")
 
-    total = len(run.executions)
-    completed = sum(1 for e in run.executions if e.status == ExecutionStatus.COMPLETED)
-    failed = sum(1 for e in run.executions if e.status == ExecutionStatus.FAILED)
-    pending = sum(1 for e in run.executions if e.status in [ExecutionStatus.PENDING, ExecutionStatus.PROCESSING])
+    run, stats = result
 
     return BenchmarkRunDetailResponse(
         id=run.id,
         name=run.name,
         status=run.status,
         created_at=run.created_at,
-        total_executions=total,
-        completed_executions=completed,
-        failed_executions=failed,
-        pending_executions=pending,
+        total_executions=stats["total"],
+        completed_executions=stats["completed"],
+        failed_executions=stats["failed"],
+        pending_executions=stats["pending"],
         executions=run.executions  # type: ignore
     )
 
