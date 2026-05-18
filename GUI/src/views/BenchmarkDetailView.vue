@@ -258,17 +258,17 @@ const diffResult = computed(() => {
         </div>
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-50 text-gray-500">
-              <tr>
-                <th class="px-5 py-3 text-left font-medium">Model LLM</th>
-                <th class="px-5 py-3 text-left font-medium">Test Case (ID)</th>
-                <th class="px-5 py-3 text-left font-medium">Status</th>
-                <th class="px-5 py-3 text-center font-medium">Wynik</th>
-                <th class="px-5 py-3 text-left font-medium">Koniec procesowania</th>
-                <th class="px-5 py-3 text-right font-medium">Czas (s)</th>
-                <th class="px-5 py-3 text-center font-medium">Akcje</th>
-              </tr>
-            </thead>
+             <thead class="bg-gray-50 text-gray-500">
+               <tr>
+                 <th class="px-5 py-3 text-left font-medium">Model LLM</th>
+                 <th class="px-5 py-3 text-left font-medium">Test Case (ID)</th>
+                 <th class="px-5 py-3 text-left font-medium">Status</th>
+                 <th class="px-5 py-3 text-center font-medium">Wynik</th>
+                 <th class="px-5 py-3 text-left font-medium">Ostatnia aktualizacja</th>
+                 <th class="px-5 py-3 text-right font-medium">Czas (s)</th>
+                 <th class="px-5 py-3 text-center font-medium">Akcje</th>
+               </tr>
+             </thead>
             <tbody class="divide-y divide-gray-200">
               <tr v-for="exec in run.executions" :key="exec.id" class="hover:bg-gray-50">
                 <td class="px-5 py-3 font-medium text-gray-800" :title="exec.llm_model_id">
@@ -324,13 +324,35 @@ const diffResult = computed(() => {
           </button>
         </div>
 
-        <div class="p-5 overflow-y-auto space-y-6 flex-1">
-            <div v-if="selectedExecution.error_message" class="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
-              <h4 class="text-sm font-semibold text-red-700 mb-2">Błąd:</h4>
-              <div class="text-sm text-red-600 font-mono whitespace-pre-wrap">{{ selectedExecution.error_message }}</div>
-            </div>
+         <div class="p-5 overflow-y-auto space-y-6 flex-1">
+             <div v-if="selectedExecution.input_text || selectedExecution.file_asset_names?.length" class="bg-gray-50 p-4 rounded-md mb-4">
+               <div v-if="selectedExecution.input_text" class="mb-4">
+                 <p class="text-sm font-medium text-gray-700 mb-1">Treść zadania:</p>
+                 <div class="bg-white p-3 rounded border border-gray-200 text-sm whitespace-pre-wrap">{{ selectedExecution.input_text }}</div>
+               </div>
+               <div v-if="selectedExecution.file_asset_names?.length">
+                 <p class="text-sm font-medium text-gray-700 mb-1">Powiązane pliki:</p>
+                 <div class="bg-white p-3 rounded border border-gray-200 text-sm">
+                   <template v-for="(fileName, index) in selectedExecution.file_asset_names" :key="index">
+                     <div class="flex items-center gap-2 mb-1" v-if="index < selectedExecution.file_asset_names.length - 1">
+                       <div class="w-3 h-3 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-xs">📎</div>
+                       <span>{{ fileName }}</span>
+                     </div>
+                     <div class="flex items-center gap-2" v-else>
+                       <div class="w-3 h-3 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-xs">📎</div>
+                       <span>{{ fileName }}</span>
+                     </div>
+                   </template>
+                 </div>
+               </div>
+             </div>
 
-            <div>
+             <div v-if="selectedExecution.error_message" class="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+               <h4 class="text-sm font-semibold text-red-700 mb-2">Błąd:</h4>
+               <div class="text-sm text-red-600 font-mono whitespace-pre-wrap">{{ selectedExecution.error_message }}</div>
+             </div>
+
+             <div>
               <h4 class="text-sm font-semibold text-gray-700 mb-2">Różnice:</h4>
               <div
                 class="bg-gray-900 p-4 rounded-md border border-gray-700 text-sm font-mono whitespace-pre-wrap min-h-[100px] overflow-x-auto leading-relaxed">

@@ -37,6 +37,8 @@ class BenchmarkExecutionResponse(BaseModel):
     updated_at: datetime
     llm_model_name: Optional[str] = None
     expected_output: Optional[str] = None
+    input_text: Optional[str] = None
+    file_asset_names: List[str] = []
 
     class Config:
         from_attributes = True

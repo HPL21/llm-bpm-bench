@@ -59,5 +59,13 @@ class BenchmarkExecution(Base):
     def expected_output(self) -> str | None:
         return self.test_case.expected_output if self.test_case else None
 
+    @property
+    def input_text(self) -> str | None:
+        return self.test_case.input_text if self.test_case else None
+
+    @property
+    def file_asset_names(self) -> list[str]:
+        return [file.filename for file in self.test_case.files] if self.test_case and self.test_case.files else []
+
     def __repr__(self) -> str:
         return f"<BenchmarkExecution(id={self.id}, status='{self.status}')>"

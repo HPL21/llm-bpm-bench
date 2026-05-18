@@ -175,21 +175,23 @@ export interface BenchmarkRun {
 }
 
 export interface BenchmarkExecution {
-  id: string;
-  test_case_id: string;
-  llm_model_id: string;
-  status: string;
-  response_text: string | null;
-  score: number | null;
-  error_message: string | null;
-  prompt_tokens: number | null;
-  completion_tokens: number | null;
-  latency_ms: number | null;
-  updated_at: string;
-  created_at?: string;
-  llm_model_name?: string; 
-  expected_output?: string | null;
-}
+   id: string;
+   test_case_id: string;
+   llm_model_id: string;
+   status: string;
+   response_text: string | null;
+   score: number | null;
+   error_message: string | null;
+   prompt_tokens: number | null;
+   completion_tokens: number | null;
+   latency_ms: number | null;
+   updated_at: string;
+   created_at?: string;
+   llm_model_name?: string; 
+   expected_output?: string | null;
+   input_text?: string | null;
+   file_asset_names?: string[];
+ }
 
 export interface BenchmarkRunDetail extends BenchmarkRun {
   completed_executions: number;

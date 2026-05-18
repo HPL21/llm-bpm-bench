@@ -78,7 +78,7 @@ class BenchmarkService:
             .where(BenchmarkRun.id == run_id)
             .options(
                 selectinload(BenchmarkRun.executions).joinedload(BenchmarkExecution.llm_model),
-                selectinload(BenchmarkRun.executions).joinedload(BenchmarkExecution.test_case)
+                selectinload(BenchmarkRun.executions).joinedload(BenchmarkExecution.test_case).selectinload(TestCase.files)
             )
         )
         result = await db.execute(stmt)
