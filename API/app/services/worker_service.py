@@ -132,7 +132,20 @@ class WorkerService:
                 execution, llm_model, test_case, test_suite = await self._fetch_execution_data(db, execution_id)
 
                 logger.info(f"Procesowanie [{execution_id}]: Model='{llm_model.name}', TestCase='{test_case.id}'")
-                client = LLMClientFactory.get_client(llm_model)
+                base_parameters = llm_model.parameters or {}
+                suite_parameters = test_suite.parameters or {}
+                merged_parameters = {**base_parameters, **suite_parameters}
+                temp_llm_model = LLMModel(
+                    id=llm_model.id,
+                    name=llm_model.name,
+                    provider=llm_model.provider,
+                    api_base_url=llm_model.api_base_url,
+                    model_identifier=llm_model.model_identifier,
+                    api_key=llm_model.api_key,
+                    parameters=merged_parameters,
+                    is_active=llm_model.is_active
+                )
+                client = LLMClientFactory.get_client(temp_llm_model)
 
                 combined_prompt, images_list = await self._prepare_prompt_and_images(test_case, test_suite, client)
 
