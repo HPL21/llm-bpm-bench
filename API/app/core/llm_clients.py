@@ -23,10 +23,11 @@ class LLMTimeoutError(LLMException):
 
 class LLMAPIError(LLMException):
     """Serwer zwrócił błąd HTTP (np. 400 Bad Request, 500 Internal Server Error)."""
-    def __init__(self, message: str, status_code: int, response_body: str):
+    def __init__(self, message: str, status_code: int, response_body: str, elapsed_time: float | None = None):
         super().__init__(message)
         self.status_code = status_code
         self.response_body = response_body
+        self.elapsed_time = elapsed_time
 
 
 class BaseLLMClient(ABC):
@@ -34,7 +35,7 @@ class BaseLLMClient(ABC):
         self.model_config = model_config
         self.base_url = model_config.api_base_url.rstrip("/")
         self.model_name = model_config.model_identifier
-        self.timeout = httpx.Timeout(900.0)
+        self.timeout = httpx.Timeout(1800.0)
 
     @abstractmethod
     async def generate(
@@ -76,7 +77,8 @@ class BaseLLMClient(ABC):
                     raise LLMAPIError(
                         message=f"API Error {response.status_code}: {error_detail}",
                         status_code=response.status_code,
-                        response_body=response.text
+                        response_body=response.text,
+                        elapsed_time=elapsed
                     )
                 return response
 

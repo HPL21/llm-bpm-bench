@@ -10,7 +10,7 @@ from app.models.llm_model import LLMModel
 from app.models.test_case import TestCase
 from app.models.test_suite import TestSuite
 from app.core.config import settings
-from app.core.llm_clients import BaseLLMClient, LLMClientFactory, LLMException
+from app.core.llm_clients import BaseLLMClient, LLMClientFactory, LLMException, LLMAPIError
 from app.core.utils import clean_llm_response
 from app.services.evaluation_service import EvaluationService, EvaluationException
 from app.services.prompt_service import PromptService
@@ -193,6 +193,14 @@ class WorkerService:
                 )
 
                 logger.info(f"Zakończono sukcesem [{execution_id}]. Wynik ewaluacji ({test_suite.verification_method}): {score}")
+
+            except LLMAPIError as e:
+                logger.error(f"Błąd API LLM dla [{execution_id}]: {str(e)} (Status: {e.status_code}, Body: {e.response_body})")
+                if execution:
+                    execution.status = ExecutionStatus.FAILED
+                    execution.latency_ms = e.elapsed_time * 1000 if e.elapsed_time else None
+                    execution.error_message = f"Błąd API LLM: {str(e)} (Status: {e.status_code})"
+                    await db.commit()
 
             except LLMException as e:
                 logger.error(f"Błąd klienta LLM dla [{execution_id}]: {str(e)}")

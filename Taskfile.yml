@@ -53,7 +53,6 @@ tasks:
       - docker compose stop worker
       - docker compose rm -f worker
       - docker compose up -d --build worker
-      - docker compose logs -f worker
 
   gui-restart:
     desc: Stop, remove, rebuild and restart GUI (full refresh)
@@ -61,7 +60,6 @@ tasks:
       - docker compose stop gui
       - docker compose rm -f gui
       - docker compose up -d --build gui
-      - docker compose logs -f gui
 
   gui-build:
     desc: Rebuild GUI container

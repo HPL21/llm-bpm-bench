@@ -268,8 +268,8 @@ class BenchmarkService:
             update(BenchmarkExecution)
             .where(
                 BenchmarkExecution.run_id == run_id,
-                BenchmarkExecution.status == ExecutionStatus.FAILED
-            )
+                BenchmarkExecution.status.in_([ExecutionStatus.FAILED, ExecutionStatus.CANCELLED])
+            )   
             .values(
                 status=ExecutionStatus.PENDING,
                 response_text=None,

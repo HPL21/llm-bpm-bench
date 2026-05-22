@@ -171,7 +171,7 @@ const diffResult = computed(() => {
            <button @click="fetchDetails" class="p-2 bg-white border rounded hover:bg-gray-50" title="Odśwież">
              <RefreshCwIcon class="w-4 h-4 text-gray-600" />
            </button>
-           <button v-if="run.failed_executions > 0" @click="repeatFailedExecutions"
+           <button v-if="run.failed_executions > 0 || run.status === 'CANCELLED'" @click="repeatFailedExecutions"
              class="flex items-center px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 text-sm font-medium">
              <RefreshCwIcon class="w-4 h-4 mr-1" /> Powtórz nieudane
            </button>
