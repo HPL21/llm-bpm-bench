@@ -193,3 +193,20 @@ async def export_benchmark_runs_to_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=benchmark_results.xlsx"}
     )
+
+@router.post("/runs/export-executions-excel")
+async def export_benchmark_executions_to_excel(
+    run_ids: List[UUID],
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Eksportuje pojedyncze wykonania benchmarków z wybranych uruchomień do pliku Excel.
+    """
+    import io
+    excel_data = await benchmark_service.export_executions_to_excel(db, run_ids)
+
+    return StreamingResponse(
+        io.BytesIO(excel_data),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=benchmark_executions.xlsx"}
+    )

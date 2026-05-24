@@ -171,7 +171,7 @@ class QdrantService:
         collection_name: str,
         query: str,
         model_id: str | None = None,
-        limit: int = 5
+        limit: int = 10
     ) -> list[tuple[str, int | None, str | None]]:
         """
         Search for relevant text chunks in Qdrant.
@@ -203,7 +203,7 @@ class QdrantService:
         collection_name: str,
         queries: list[str],
         model_id: str | None = None,
-        limit: int = 5
+        limit: int = 10
     ) -> list[tuple[str, int | None, str | None]]:
         """
         Search for relevant text chunks in Qdrant using multiple queries (Multi-Query RAG).

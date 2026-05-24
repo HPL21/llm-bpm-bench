@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+import signal
 
 from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
@@ -23,6 +24,12 @@ class WorkerService:
 
     def __init__(self):
         self.prompt_service = PromptService()
+        self._stop_event = asyncio.Event()
+
+    def _trigger_shutdown(self):
+        """Handler wywoływany w momencie otrzymania sygnału systemowego"""
+        logger.info("Otrzymano sygnał zatrzymania. Oczekiwanie na ukończenie obecnego zadania (soft kill)...")
+        self._stop_event.set()
 
     async def _fetch_execution_data(self, db, execution_id: uuid.UUID) -> tuple:
         """Fetch execution, model, test_case, test_suite from database"""
@@ -230,7 +237,15 @@ class WorkerService:
     async def worker_loop(self):
         """Main worker loop that processes pending executions"""
         logger.info("Uruchamianie serwisu workera Benchmarków...")
-        while True:
+
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, self._trigger_shutdown)
+            except NotImplementedError:
+                pass
+
+        while not self._stop_event.is_set():
             try:
                 async with AsyncSessionLocal() as db:
                     stmt = (
@@ -253,8 +268,16 @@ class WorkerService:
                 if execution_id:
                     await self.process_single_execution(execution_id)
                 else:
-                    await asyncio.sleep(30)
+                    try:
+                        await asyncio.wait_for(self._stop_event.wait(), timeout=30.0)
+                    except asyncio.TimeoutError:
+                        pass
 
             except Exception as e:
                 logger.error(f"Błąd krytyczny w pętli workera: {str(e)}")
-                await asyncio.sleep(60)
+                try:
+                    await asyncio.wait_for(self._stop_event.wait(), timeout=60.0)
+                except asyncio.TimeoutError:
+                    pass
+
+        logger.info("Worker został poprawnie zatrzymany.")

@@ -115,6 +115,16 @@ tasks:
     cmds:
       - docker compose stop worker
 
+  worker-soft-stop:
+    desc: Graceful worker stop (SIGTERM + 3600s grace period - finishes current jobs before stopping)
+    cmds:
+      - docker stop --time 3600 {{.WORKER_CONTAINER}}
+
+  worker-soft-restart:
+    desc: Graceful worker restart (SIGTERM + 3600s grace period - finishes current jobs before restarting)
+    cmds:
+      - docker restart --time 3600 {{.WORKER_CONTAINER}}
+
   worker-start:
     desc: Start the worker container
     cmds:

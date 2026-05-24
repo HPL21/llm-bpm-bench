@@ -246,6 +246,13 @@ export const BenchmarkService = {
       responseType: 'blob'
     });
     return response.data;
+  },
+
+  async exportExecutionsToExcel(runIds: string[]) {
+    const response = await api.post(`/benchmarks/runs/export-executions-excel`, runIds, {
+      responseType: 'blob'
+    });
+    return response.data;
   }
 };
 

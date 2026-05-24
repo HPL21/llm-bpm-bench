@@ -197,6 +197,76 @@ class BenchmarkService:
         excel_bytes = await asyncio.to_thread(self._generate_excel_sync, summary)
         return excel_bytes
 
+    async def export_executions_to_excel(self, db: AsyncSession, run_ids: List[UUID]) -> bytes:
+        if Workbook is None:  # pragma: no cover
+            raise RuntimeError("openpyxl is not installed.")
+
+        executions_data = await self._get_executions_for_export(db, run_ids)
+        excel_bytes = await asyncio.to_thread(self._generate_executions_excel_sync, executions_data)
+        return excel_bytes
+
+    async def _get_executions_for_export(self, db: AsyncSession, run_ids: List[UUID]) -> list:
+        stmt = (
+            select(
+                LLMModel.name.label("model_name"),
+                TestSuite.name.label("suite_name"),
+                BenchmarkExecution.score,
+                BenchmarkExecution.prompt_tokens,
+                BenchmarkExecution.completion_tokens,
+                BenchmarkExecution.latency_ms,
+            )
+            .select_from(BenchmarkExecution)
+            .join(LLMModel, BenchmarkExecution.llm_model_id == LLMModel.id)
+            .join(TestCase, BenchmarkExecution.test_case_id == TestCase.id)
+            .join(TestSuite, TestCase.suite_id == TestSuite.id)
+            .where(BenchmarkExecution.run_id.in_(run_ids))
+            .where(BenchmarkExecution.status != ExecutionStatus.PENDING)
+            .order_by(TestCase.suite_id, TestCase.id, BenchmarkExecution.id)
+        )
+        result = await db.execute(stmt)
+        return result.all()
+
+    def _generate_executions_excel_sync(self, executions_data: list) -> bytes:
+        wb = Workbook()  # type: ignore
+        ws = wb.active
+        ws.title = "Benchmark Executions"  # type: ignore
+
+        headers = ["Model", "Test Suite", "Score", "Total Tokens", "Latency (s)"]
+        ws.append(headers)  # type: ignore
+
+        for row in executions_data:
+            total_tokens = (row.prompt_tokens or 0) + (row.completion_tokens or 0)
+            latency_seconds = round((row.latency_ms or 0) / 1000.0, 2)
+            ws.append([
+                row.model_name,
+                row.suite_name,
+                row.score if row.score is not None else "",
+                total_tokens,
+                latency_seconds
+            ])
+
+        header_font = Font(bold=True)
+        for cell in ws[1]:  # type: ignore
+            cell.font = header_font
+
+        thin_border = Border(
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin')
+        )
+
+        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):  # type: ignore
+            for cell in row:
+                cell.border = thin_border
+
+        for idx, column_cells in enumerate(ws.columns, 1):  # type: ignore
+            length = max(len(str(cell.value)) for cell in column_cells)
+            ws.column_dimensions[get_column_letter(idx)].width = min(length + 2, 30)
+
+        excel_bytes = io.BytesIO()
+        wb.save(excel_bytes)
+        excel_bytes.seek(0)
+        return excel_bytes.read()
+
     def _generate_excel_sync(self, summary_data: list) -> bytes:
         rows = sorted([
             [

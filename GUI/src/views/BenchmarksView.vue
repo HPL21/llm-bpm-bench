@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { BenchmarkService, type BenchmarkRun } from '../services/api';
-import { ActivityIcon, PlusIcon, ChevronRightIcon, TrashIcon, DownloadIcon } from 'lucide-vue-next';
+import { ActivityIcon, PlusIcon, ChevronRightIcon, TrashIcon, DownloadIcon, FileIcon } from 'lucide-vue-next';
 import BenchmarkModal from '../components/benchmarks/BenchmarkModal.vue';
 
 const router = useRouter();
@@ -88,6 +88,25 @@ const exportToExcel = async () => {
     alert("Wystąpił błąd podczas eksportowania do Excel");
   }
 };
+
+const exportExecutionsToExcel = async () => {
+  if (selectedIds.value.size === 0) return;
+  
+  try {
+    const blob = await BenchmarkService.exportExecutionsToExcel(Array.from(selectedIds.value));
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'benchmark_executions.xlsx');
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Error exporting executions to Excel:", error);
+    alert("Wystąpił błąd podczas eksportowania wykonań do Excel");
+  }
+};
 </script>
 
 <template>
@@ -112,7 +131,15 @@ const exportToExcel = async () => {
       class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center shadow-sm"
     >
       <DownloadIcon class="w-4 h-4 mr-2" />
-      Eksportuj do Excel ({{ selectedIds.size }})
+      Eksportuj zestawienie ({{ selectedIds.size }})
+    </button>
+    <button 
+      v-if="selectedIds.size > 0"
+      @click="exportExecutionsToExcel"
+      class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center shadow-sm"
+    >
+      <FileIcon class="w-4 h-4 mr-2" />
+      Eksportuj wykonania ({{ selectedIds.size }})
     </button>
     <button @click="showModal = true" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center shadow-sm">
       <PlusIcon class="w-4 h-4 mr-2" />

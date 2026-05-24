@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import logging
 from typing import Optional, List, Tuple
 
@@ -49,7 +50,9 @@ class PromptService:
         )
 
         try:
-            mq_response, _, _ = await client.generate(
+            client_copy = copy.deepcopy(client)
+            client_copy.model_config.parameters["thinking_budget_tokens"] = 512
+            mq_response, _, _ = await client_copy.generate(
                 prompt=original_query,
                 system_prompt=mq_system_prompt
             )
@@ -66,7 +69,7 @@ class PromptService:
             collection_name=test_suite.qdrant_collection,  # type: ignore
             queries=queries,
             model_id=str(test_suite.embedding_model_id) if test_suite.embedding_model_id else None,
-            limit=5
+            limit=10
         )
 
         context_parts = []
