@@ -248,12 +248,12 @@ export const BenchmarkService = {
     return response.data;
   },
 
-  async exportExecutionsToExcel(runIds: string[]) {
-    const response = await api.post(`/benchmarks/runs/export-executions-excel`, runIds, {
-      responseType: 'blob'
-    });
-    return response.data;
-  }
+   async exportExecutionsToCsv(runIds: string[]) {
+     const response = await api.post(`/benchmarks/runs/export-executions-csv`, runIds, {
+       responseType: 'blob'
+     });
+     return response.data;
+   }
 };
 
 export interface QdrantCollection {

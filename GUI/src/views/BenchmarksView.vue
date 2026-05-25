@@ -89,24 +89,24 @@ const exportToExcel = async () => {
   }
 };
 
-const exportExecutionsToExcel = async () => {
-  if (selectedIds.value.size === 0) return;
-  
-  try {
-    const blob = await BenchmarkService.exportExecutionsToExcel(Array.from(selectedIds.value));
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'benchmark_executions.xlsx');
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode?.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error("Error exporting executions to Excel:", error);
-    alert("Wystąpił błąd podczas eksportowania wykonań do Excel");
-  }
-};
+const exportExecutionsToCsv = async () => {
+   if (selectedIds.value.size === 0) return;
+   
+   try {
+     const blob = await BenchmarkService.exportExecutionsToCsv(Array.from(selectedIds.value));
+     const url = window.URL.createObjectURL(blob);
+     const link = document.createElement('a');
+     link.href = url;
+     link.setAttribute('download', 'benchmark_executions.csv');
+     document.body.appendChild(link);
+     link.click();
+     link.parentNode?.removeChild(link);
+     window.URL.revokeObjectURL(url);
+   } catch (error) {
+     console.error("Error exporting executions to CSV:", error);
+     alert("Wystąpił błąd podczas eksportowania wykonań do CSV");
+   }
+ };
 </script>
 
 <template>
@@ -133,14 +133,14 @@ const exportExecutionsToExcel = async () => {
       <DownloadIcon class="w-4 h-4 mr-2" />
       Eksportuj zestawienie ({{ selectedIds.size }})
     </button>
-    <button 
-      v-if="selectedIds.size > 0"
-      @click="exportExecutionsToExcel"
-      class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center shadow-sm"
-    >
-      <FileIcon class="w-4 h-4 mr-2" />
-      Eksportuj wykonania ({{ selectedIds.size }})
-    </button>
+     <button 
+       v-if="selectedIds.size > 0"
+       @click="exportExecutionsToCsv"
+       class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center shadow-sm"
+     >
+       <FileIcon class="w-4 h-4 mr-2" />
+       Eksportuj wykonania ({{ selectedIds.size }})
+     </button>
     <button @click="showModal = true" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center shadow-sm">
       <PlusIcon class="w-4 h-4 mr-2" />
       Nowy Benchmark
