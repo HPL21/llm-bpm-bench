@@ -118,30 +118,37 @@ class WorkerService:
             execution.error_message = f"Uzasadnienie sędziego: {eval_details['reason']}"
         elif "error" in eval_details:
             execution.error_message = eval_details["error"]
+            execution.status = ExecutionStatus.FAILED
 
+        db.add(execution)
         await db.commit()
 
     async def process_single_execution(self, execution_id: uuid.UUID):
         """
-        Pobiera dane wykonania, wywołuje LLM i ewaluację, a następnie zapisuje wyniki.
+        Pobiera dane wykonania, zamyka sesję, wywołuje LLM i ewaluację bez blokowania bazy,
+        a następnie otwiera nową sesję i zapisuje wyniki.
         """
-        execution = None
         cleaned_response_text = None
         latency_ms = None
         prompt_tokens = None
         completion_tokens = None
         score = None
-        question = None
         eval_details = {}
 
         async with AsyncSessionLocal() as db:
             try:
                 execution, llm_model, test_case, test_suite = await self._fetch_execution_data(db, execution_id)
-
                 logger.info(f"Procesowanie [{execution_id}]: Model='{llm_model.name}', TestCase='{test_case.id}'")
+                expected_text = test_case.expected_output or ""
+                system_prompt = test_suite.system_prompt
+                eval_prompt = test_suite.eval_prompt
+                verification_method = test_suite.verification_method
+                question = test_case.input_text if test_suite.qdrant_collection else None
+
                 base_parameters = llm_model.parameters or {}
                 suite_parameters = test_suite.parameters or {}
                 merged_parameters = {**base_parameters, **suite_parameters}
+
                 temp_llm_model = LLMModel(
                     id=llm_model.id,
                     name=llm_model.name,
@@ -156,12 +163,9 @@ class WorkerService:
 
                 combined_prompt, images_list = await self._prepare_prompt_and_images(test_case, test_suite, client)
 
-                expected_text = test_case.expected_output or ""
-
                 judge_client = None
-                if test_suite.verification_method == "LLM_EVAL":
+                if verification_method == "LLM_EVAL":
                     judge_model_name = settings.JUDGE_MODEL_NAME
-
                     if not judge_model_name:
                         raise Exception("Brak zmiennej JUDGE_MODEL_NAME w pliku .env (lub ma pustą wartość)!")
 
@@ -174,50 +178,68 @@ class WorkerService:
 
                     judge_client = LLMClientFactory.get_client(judge_model)
 
-                    question = test_case.input_text if test_suite.qdrant_collection else None
-
-                cleaned_response_text, score, eval_details, latency_ms, prompt_tokens, completion_tokens = await self._execute_llm_and_process(  # noqa
-                    client=client,
-                    prompt=combined_prompt,
-                    system_prompt=test_suite.system_prompt,
-                    images=images_list,
-                    verification_method=test_suite.verification_method,
-                    expected_text=expected_text,
-                    judge_client=judge_client,
-                    eval_prompt=test_suite.eval_prompt,
-                    question=question
-                 )
-
-                await self._save_results(
-                    execution=execution,
-                    db=db,
-                    cleaned_response_text=cleaned_response_text,
-                    score=score,
-                    latency_ms=latency_ms,
-                    prompt_tokens=prompt_tokens,
-                    completion_tokens=completion_tokens,
-                    eval_details=eval_details
-                )
-
-                logger.info(f"Zakończono sukcesem [{execution_id}]. Wynik ewaluacji ({test_suite.verification_method}): {score}")
-
-            except LLMAPIError as e:
-                logger.error(f"Błąd API LLM dla [{execution_id}]: {str(e)} (Status: {e.status_code}, Body: {e.response_body})")
+            except Exception as e:
+                logger.error(f"Nieoczekiwany błąd inicjalizacji danych dla [{execution_id}]: {str(e)}", exc_info=True)
+                execution = await db.get(BenchmarkExecution, execution_id)
                 if execution:
                     execution.status = ExecutionStatus.FAILED
-                    execution.latency_ms = e.elapsed_time * 1000 if e.elapsed_time else None
+                    execution.error_message = f"Błąd przygotowania danych: {str(e)}"
+                    await db.commit()
+                return
+
+        try:
+            (
+                cleaned_response_text, score, eval_details, latency_ms, prompt_tokens, completion_tokens
+            ) = await self._execute_llm_and_process(
+                client=client,
+                prompt=combined_prompt,
+                system_prompt=system_prompt,
+                images=images_list,
+                verification_method=verification_method,
+                expected_text=expected_text,
+                judge_client=judge_client,
+                eval_prompt=eval_prompt,
+                question=question
+            )
+
+            async with AsyncSessionLocal() as db:
+                execution = await db.get(BenchmarkExecution, execution_id)
+                if execution:
+                    await self._save_results(
+                        execution=execution,
+                        db=db,
+                        cleaned_response_text=cleaned_response_text,
+                        score=score,
+                        latency_ms=latency_ms,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        eval_details=eval_details
+                    )
+                    logger.info(f"Zakończono sukcesem [{execution_id}]. Wynik ewaluacji ({verification_method}): {score}")
+
+        except LLMAPIError as e:
+            logger.error(f"Błąd API LLM dla [{execution_id}]: {str(e)} (Status: {e.status_code}, Body: {e.response_body})")
+            async with AsyncSessionLocal() as db:
+                execution = await db.get(BenchmarkExecution, execution_id)
+                if execution:
+                    execution.status = ExecutionStatus.FAILED
+                    execution.latency_ms = e.elapsed_time * 1000 if e.elapsed_time else None  # type: ignore
                     execution.error_message = f"Błąd API LLM: {str(e)} (Status: {e.status_code})"
                     await db.commit()
 
-            except LLMException as e:
-                logger.error(f"Błąd klienta LLM dla [{execution_id}]: {str(e)}")
+        except LLMException as e:
+            logger.error(f"Błąd klienta LLM dla [{execution_id}]: {str(e)}")
+            async with AsyncSessionLocal() as db:
+                execution = await db.get(BenchmarkExecution, execution_id)
                 if execution:
                     execution.status = ExecutionStatus.FAILED
                     execution.error_message = str(e)
                     await db.commit()
 
-            except EvaluationException as e:
-                logger.error(f"Błąd weryfikacji odpowiedzi [{execution_id}]: {str(e)}")
+        except EvaluationException as e:
+            logger.error(f"Błąd weryfikacji odpowiedzi [{execution_id}]: {str(e)}")
+            async with AsyncSessionLocal() as db:
+                execution = await db.get(BenchmarkExecution, execution_id)
                 if execution:
                     execution.response_text = cleaned_response_text
                     execution.latency_ms = latency_ms
@@ -227,8 +249,10 @@ class WorkerService:
                     execution.error_message = str(e)
                     await db.commit()
 
-            except Exception as e:
-                logger.error(f"Nieoczekiwany błąd procesowania [{execution_id}]: {str(e)}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Nieoczekiwany błąd procesowania [{execution_id}]: {str(e)}", exc_info=True)
+            async with AsyncSessionLocal() as db:
+                execution = await db.get(BenchmarkExecution, execution_id)
                 if execution:
                     execution.status = ExecutionStatus.FAILED
                     execution.error_message = f"Błąd wewnętrzny workera: {str(e)}"
@@ -247,6 +271,7 @@ class WorkerService:
 
         while not self._stop_event.is_set():
             try:
+                execution_id = None
                 async with AsyncSessionLocal() as db:
                     stmt = (
                         select(BenchmarkExecution.id)
