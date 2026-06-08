@@ -18,7 +18,7 @@ class SuiteService:
         result = await db.execute(
             select(TestSuite)
             .where(TestSuite.is_deleted.is_not(True))
-            .order_by(TestSuite.created_at.desc())
+            .order_by(TestSuite.name.asc())
         )
         return result.scalars().all()
 
